@@ -6,8 +6,9 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use sqlx::postgres::PgPool;
+use std::collections::HashMap;
 use tera::Tera;
 use tower_http::trace::TraceLayer;
 use tracing;
@@ -60,6 +61,38 @@ struct CoverageSummary {
     line: Coverage,
 }
 
+#[derive(sqlx::FromRow, Debug)]
+struct SummaryTableEntry {
+    #[sqlx(rename = "inserttime")]
+    insert_time: sqlx::types::chrono::NaiveDateTime,
+    // insert_time: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
+    org: String,
+    repo: String,
+    coverage: sqlx::types::JsonValue,
+}
+
+impl Serialize for SummaryTableEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("SummaryTableEntry", 4)?;
+
+        state.serialize_field("inserttime", &self.insert_time.and_utc().timestamp())?;
+        state.serialize_field("org", &self.org)?;
+        state.serialize_field("repo", &self.repo)?;
+        state.serialize_field("coverage", &self.coverage)?;
+
+        state.end()
+    }
+}
+
+#[derive(Serialize, Debug)]
+struct GiteaOrg {
+    name: String,
+    repos: Vec<SummaryTableEntry>,
+}
+
 #[tokio::main]
 async fn main() {
     let log_dir = std::env::var("LOG_DIR").unwrap_or("./logs".to_string());
@@ -96,29 +129,30 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Serialize)]
-struct GiteaRepo {
-    name: String,
-    coverage: f64,
-}
-
-#[derive(Serialize)]
-struct GiteaOrg {
-    name: String,
-    repos: Vec<GiteaRepo>,
-}
-
 async fn root_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
+    let resp: Vec<SummaryTableEntry> = sqlx::query_as(
+        "SELECT DISTINCT org, repo, coverage, MAX(inserttime) AS inserttime FROM summary GROUP BY org, repo, coverage",
+    )
+    .fetch_all(&*db)
+    .await?;
+
+    let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
+    for entry in resp {
+        if let Some(vals) = orgs.get_mut(&entry.org) {
+            vals.push(entry);
+        } else {
+            orgs.insert(entry.org.clone(), vec![entry]);
+        }
+    }
+
+    let orgs: Vec<GiteaOrg> = orgs
+        .into_iter()
+        .map(|(k, v)| GiteaOrg { name: k, repos: v })
+        .collect();
+
+    tracing::error!("{:?}", orgs);
+
     let tera = Tera::new("templates/**/*").unwrap();
-
-    let orgs = vec![GiteaOrg {
-        name: "test".to_string(),
-        repos: vec![GiteaRepo {
-            name: "a".to_string(),
-            coverage: 55.5,
-        }],
-    }];
-
     let mut context = tera::Context::new();
     context.insert("orgs", &orgs);
 

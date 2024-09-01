@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html land="en">
+<html lang="en">
 <body>
 <h1>Coverage Summary</h1>
 <ul>
     {% for org in orgs %}
     <li><strong>{{org.name}}</strong>
         <ul>
-            {% for repo in org.repos %}
-                <li>{{repo.name}} - {{repo.coverage}} - <a href="/reports/{{org.name}}/{{repo.name}}">reports</a></li>
-            {% endfor %}
-            </ul>
+        {% for repo in org.repos %}
+            <li>{{repo.repo}} - {{repo.coverage["branch_percent"]}} - <a href="/reports/{{org.name}}/{{repo.repo}}">reports</a></li>
+        {% endfor %}
+        </ul>
     </li>
     {% endfor %}
 </ul>
