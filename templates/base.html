@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html land="en">
+<body>
+<h1>Coverage Summary</h1>
+<ul>
+    {% for org in orgs %}
+    <li><strong>{{org.name}}</strong>
+        <ul>
+            {% for repo in org.repos %}
+                <li>{{repo.name}} - {{repo.coverage}} - <a href="/reports/{{org.name}}/{{repo.name}}">reports</a></li>
+            {% endfor %}
+            </ul>
+    </li>
+    {% endfor %}
+</ul>
+</body>
+</html>
