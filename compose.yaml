@@ -1,0 +1,26 @@
+services:
+  server:
+    build: .
+    depends_on:
+      - db
+    restart: on-failure
+    ports:
+      - 1001:1001
+    environment:
+      - BIND_ADDRESS=${BIND_ADDRESS}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+
+  db:
+    image: postgres
+    restart: always
+    shm_size: 128mb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+
+volumes:
+  db-data:
