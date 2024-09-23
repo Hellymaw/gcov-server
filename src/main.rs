@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use axum::{
     extract::{Json, Path},
     http::StatusCode,
@@ -6,7 +5,8 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use lazy_static::lazy_static;
+use serde::Serialize;
 use sqlx::postgres::PgPool;
 use std::collections::HashMap;
 use tera::Tera;
@@ -14,6 +14,9 @@ use tower_http::trace::TraceLayer;
 use tracing;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+pub mod db;
+use db::summary::{CoverageSummary, SummaryTableEntry};
 
 const MAX_LOG_FILES: usize = 48;
 
@@ -38,63 +41,26 @@ where
     }
 }
 
-serde_with::with_prefix!(prefix_branch "branch_");
-serde_with::with_prefix!(prefix_function "function_");
-serde_with::with_prefix!(prefix_line "line_");
-
-#[derive(Serialize, Deserialize)]
-struct Coverage {
-    covered: usize,
-    total: usize,
-    percent: f64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct CoverageSummary {
-    #[serde(flatten, with = "prefix_branch")]
-    branch: Coverage,
-
-    #[serde(flatten, with = "prefix_function")]
-    function: Coverage,
-
-    #[serde(flatten, with = "prefix_line")]
-    line: Coverage,
-}
-
-#[derive(sqlx::FromRow, Debug)]
-struct SummaryTableEntry {
-    #[sqlx(rename = "inserttime")]
-    insert_time: sqlx::types::chrono::NaiveDateTime,
-    // insert_time: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
-    org: String,
-    repo: String,
-    coverage: sqlx::types::JsonValue,
-}
-
-impl Serialize for SummaryTableEntry {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("SummaryTableEntry", 4)?;
-
-        state.serialize_field("inserttime", &self.insert_time.and_utc().timestamp())?;
-        state.serialize_field("org", &self.org)?;
-        state.serialize_field("repo", &self.repo)?;
-        state.serialize_field("coverage", &self.coverage)?;
-
-        state.end()
-    }
-}
-
 #[derive(Serialize, Debug)]
 struct GiteaOrg {
     name: String,
     repos: Vec<SummaryTableEntry>,
 }
 
-#[tokio::main]
-async fn main() {
+lazy_static! {
+    static ref TEMPLATES: Tera = {
+        let tera = match Tera::new("templates/**/*") {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Parsing error(s): {}", e);
+                ::std::process::exit(1);
+            }
+        };
+        tera
+    };
+}
+
+fn configure_logging() -> Result<(), tracing_appender::rolling::InitError> {
     let log_dir = std::env::var("LOG_DIR").unwrap_or("./logs".to_string());
     let log_suffix = std::env::var("LOG_SUFFIX").unwrap_or("log".to_string());
 
@@ -102,8 +68,7 @@ async fn main() {
         .rotation(tracing_appender::rolling::Rotation::HOURLY)
         .filename_suffix(&log_suffix)
         .max_log_files(MAX_LOG_FILES)
-        .build(log_dir)
-        .expect("Failed to initialise rolling file appender");
+        .build(log_dir)?;
 
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
@@ -113,9 +78,23 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
         .init();
 
-    let db_pool = PgPool::connect(&construct_db_connection_string())
-        .await
-        .expect("If the DB isn't active, we're dead in the water");
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(e) = configure_logging() {
+        eprintln!("Error occurred setting up logging: {}", e);
+        ::std::process::exit(1);
+    }
+
+    let db_pool = match db::connect_and_setup().await {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("Error occurred setting up database: {}", e);
+            ::std::process::exit(3);
+        }
+    };
 
     let app = Router::new()
         .route("/:org/:repo/summary", post(summary_handler))
@@ -124,17 +103,19 @@ async fn main() {
         .layer(TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:1001".to_string());
-    let listener = tokio::net::TcpListener::bind(bind_addr).await.unwrap();
+    let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Error binding to {}: {}", bind_addr, e);
+            ::std::process::exit(2);
+        }
+    };
 
     axum::serve(listener, app).await.unwrap();
 }
 
 async fn root_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
-    let resp: Vec<SummaryTableEntry> = sqlx::query_as(
-        "SELECT DISTINCT org, repo, coverage, MAX(inserttime) AS inserttime FROM summary GROUP BY org, repo, coverage",
-    )
-    .fetch_all(&*db)
-    .await?;
+    let resp = db::summary::fetch_table(&*db).await?;
 
     let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
     for entry in resp {
@@ -152,11 +133,10 @@ async fn root_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
 
     tracing::error!("{:?}", orgs);
 
-    let tera = Tera::new("templates/**/*").unwrap();
     let mut context = tera::Context::new();
     context.insert("orgs", &orgs);
 
-    let output = tera.render("base.html", &context)?;
+    let output = TEMPLATES.render("base.html", &context)?;
 
     Ok(Html::from(output))
 }
@@ -166,25 +146,7 @@ async fn summary_handler(
     Path((org, repo)): Path<(String, String)>,
     Json(payload): Json<CoverageSummary>,
 ) -> Result<(), AppError> {
-    let json_coverage = serde_json::to_value(payload)?;
-
-    let resp = sqlx::query("INSERT INTO summary VALUES (now(), $1, $2, $3)")
-        .bind(&org)
-        .bind(&repo)
-        .bind(json_coverage)
-        .execute(&*db)
-        .await?;
-
-    if resp.rows_affected() == 1 {
-        Ok(())
-    } else {
-        Err(anyhow!("Unable to insert to DB").into())
-    }
-}
-
-fn construct_db_connection_string() -> String {
-    let pg_password = std::env::var("POSTGRES_PASSWORD").expect("This is a required env var");
-    let pg_db = std::env::var("POSTGRES_DB").expect("This is a required env var");
-
-    format!("postgres://postgres:{pg_password}@db/{pg_db}")
+    db::summary::insert_into_table(&*db, &org, &repo, &payload)
+        .await
+        .map_err(|e| e.into())
 }
