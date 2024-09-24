@@ -10,7 +10,10 @@ use serde::Serialize;
 use sqlx::postgres::PgPool;
 use std::collections::HashMap;
 use tera::Tera;
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 use tracing;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -98,9 +101,12 @@ async fn main() {
 
     let app = Router::new()
         .route("/:org/:repo/summary", post(summary_handler))
-        .route("/", get(root_handler))
+        .route("/summary", get(root_summary_handler))
         .layer(Extension(db_pool))
         .nest_service("/reports", tower_http::services::ServeDir::new("reports"))
+        .fallback_service(
+            ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html")),
+        )
         .layer(TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:1001".to_string());
@@ -115,7 +121,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn root_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
+async fn root_summary_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
     let orgs = if let Ok(resp) = db::summary::fetch_table(&*db).await {
         let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
         for entry in resp {
