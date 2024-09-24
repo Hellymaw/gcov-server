@@ -8,7 +8,7 @@ use axum::{
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sqlx::postgres::PgPool;
-use std::collections::HashMap;
+use std::{collections::HashMap, vec};
 use tera::Tera;
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -100,6 +100,7 @@ async fn main() {
     };
 
     let app = Router::new()
+        .route("/report/orgs", get(report_orgs_handler))
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/summary", get(root_summary_handler))
         .layer(Extension(db_pool))
@@ -119,6 +120,33 @@ async fn main() {
     };
 
     axum::serve(listener, app).await.unwrap();
+}
+
+#[derive(Serialize, Debug)]
+struct OrgList {
+    orgs: Vec<String>,
+}
+
+impl OrgList {
+    fn new() -> Self {
+        OrgList { orgs: Vec::new() }
+    }
+}
+
+async fn report_orgs_handler(_db: Extension<PgPool>) -> Result<Json<OrgList>, AppError> {
+    let mut reponse = OrgList::new();
+
+    let mut dir = tokio::fs::read_dir("reports").await?;
+    while let Some(entry) = dir.next_entry().await? {
+        let file_type = entry.file_type().await?;
+        if file_type.is_dir() {
+            if let Ok(file_name) = entry.file_name().into_string() {
+                reponse.orgs.push(file_name);
+            }
+        }
+    }
+
+    Ok(Json(reponse))
 }
 
 async fn root_summary_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
