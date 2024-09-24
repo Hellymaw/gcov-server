@@ -100,6 +100,7 @@ async fn main() {
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/", get(root_handler))
         .layer(Extension(db_pool))
+        .nest_service("/reports", tower_http::services::ServeDir::new("reports"))
         .layer(TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:1001".to_string());
@@ -115,23 +116,27 @@ async fn main() {
 }
 
 async fn root_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
-    let resp = db::summary::fetch_table(&*db).await?;
-
-    let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
-    for entry in resp {
-        if let Some(vals) = orgs.get_mut(&entry.org) {
-            vals.push(entry);
-        } else {
-            orgs.insert(entry.org.clone(), vec![entry]);
+    let orgs = if let Ok(resp) = db::summary::fetch_table(&*db).await {
+        let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
+        for entry in resp {
+            if let Some(vals) = orgs.get_mut(&entry.org) {
+                vals.push(entry);
+            } else {
+                orgs.insert(entry.org.clone(), vec![entry]);
+            }
         }
-    }
 
-    let orgs: Vec<GiteaOrg> = orgs
-        .into_iter()
-        .map(|(k, v)| GiteaOrg { name: k, repos: v })
-        .collect();
+        let orgs: Vec<GiteaOrg> = orgs
+            .into_iter()
+            .map(|(k, v)| GiteaOrg { name: k, repos: v })
+            .collect();
 
-    tracing::error!("{:?}", orgs);
+        tracing::error!("{:?}", orgs);
+
+        orgs
+    } else {
+        Vec::new()
+    };
 
     let mut context = tera::Context::new();
     context.insert("orgs", &orgs);
