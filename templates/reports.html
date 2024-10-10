@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<body>
+<h1>Reports</h1>
+<table>
+    <tr>
+        <td>Report Time</td>
+        <td>Organisation</td>
+        <td>Repository</td>
+        <td>Branch</td>
+        <td>Commit</td>
+        <td>Data...</td>
+    </tr>
+{% for report in reports %}
+    <tr>
+        <td>{{report.insert_time}}</td>
+        <td>{{report.org}}</td>
+        <td>{{report.repo}}</td>
+        <td>{{report.branch}}</td>
+        <td>{{report.commit}}</td>
+    </tr>
+{% endfor %}
+</table>
+</body>
+</html>

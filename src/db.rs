@@ -40,6 +40,7 @@ pub async fn connect_and_setup() -> Result<Pool<Postgres>, sqlx::Error> {
     let db_pool = PgPool::connect(&CONNECTION_URL).await?;
 
     let _ = summary::setup_table(&db_pool).await?;
+    let _ = reports::setup_table(&db_pool).await?;
 
     Ok(db_pool)
 }
@@ -148,5 +149,89 @@ pub mod summary {
         .await?;
 
         Ok(resp)
+    }
+}
+
+pub mod reports {
+    use crate::db::DbError;
+    use serde::{ser::SerializeStruct, Serialize};
+    use sqlx::{postgres::PgQueryResult, PgPool};
+
+    /// Represents a row in the 'summary' db table
+    #[derive(sqlx::FromRow, Debug)]
+    pub struct ReportTableEntry {
+        /// Row insertion time
+        pub insert_time: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
+        /// Gitea organisation the repo belongs to
+        pub org: String,
+        /// Gitea repository the report belongs to
+        pub repo: String,
+        /// Git branch the report belongs to
+        pub branch: String,
+        /// Git commit the report belongs to
+        pub commit: String,
+    }
+
+    impl Serialize for ReportTableEntry {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let mut state = serializer.serialize_struct("ReportTableEntry", 4)?;
+
+            state.serialize_field("insert_time", &self.insert_time.timestamp())?;
+            state.serialize_field("org", &self.org)?;
+            state.serialize_field("repo", &self.repo)?;
+            state.serialize_field("branch", &self.branch)?;
+            state.serialize_field("commit", &self.commit)?;
+
+            state.end()
+        }
+    }
+
+    /// Creates the report db table if it doesn't exist
+    pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
+        sqlx::query(
+            r#"CREATE TABLE IF NOT EXISTS reports (
+                        report_id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                        insert_time timestamptz,
+                        org varchar,
+                        repo varchar,
+                        branch varchar,
+                        commit varchar
+                    );"#,
+        )
+        .execute(db)
+        .await
+    }
+
+    /// Fetches the report table
+    pub async fn fetch_table(db: &PgPool) -> Result<Vec<ReportTableEntry>, DbError> {
+        let resp: Vec<ReportTableEntry> = sqlx::query_as(
+            "SELECT insert_time, org, repo, branch, commit FROM reports ORDER BY org, repo, insert_time",
+        )
+        .fetch_all(&*db)
+        .await?;
+
+        Ok(resp)
+    }
+
+    /// Inserts a test coverage report into the report db table
+    pub async fn insert_into_table(
+        db: &PgPool,
+        organisation: &str,
+        repository: &str,
+        branch: &str,
+        commit: &str,
+    ) -> Result<(), DbError> {
+        let _resp = sqlx::query("INSERT INTO reports(insert_time, org, repo, branch, commit) VALUES (now(), $1, $2, $3, $4)")
+            .bind(organisation)
+            .bind(repository)
+            .bind(branch)
+            .bind(commit)
+            .execute(db)
+            .await?;
+
+        Ok(())
     }
 }

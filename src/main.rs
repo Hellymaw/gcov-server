@@ -7,7 +7,7 @@ use axum::{
 };
 use lazy_static::lazy_static;
 use serde::Serialize;
-use sqlx::postgres::PgPool;
+use sqlx::postgres::{PgPool, PgRow};
 use std::{collections::HashMap, vec};
 use tera::Tera;
 use tower_http::{
@@ -100,11 +100,11 @@ async fn main() {
     };
 
     let app = Router::new()
-        .route("/report/orgs", get(report_orgs_handler))
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/summary", get(root_summary_handler))
+        .route("/reports", get(reports_page_handler))
         .layer(Extension(db_pool))
-        .nest_service("/reports", tower_http::services::ServeDir::new("reports"))
+        .nest_service("/reports/", tower_http::services::ServeDir::new("reports"))
         .fallback_service(
             ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html")),
         )
@@ -122,31 +122,14 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Serialize, Debug)]
-struct OrgList {
-    orgs: Vec<String>,
-}
+async fn reports_page_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
+    let reports = db::reports::fetch_table(&db).await?;
+    let mut context = tera::Context::new();
+    context.insert("reports", &reports);
 
-impl OrgList {
-    fn new() -> Self {
-        OrgList { orgs: Vec::new() }
-    }
-}
+    let output = TEMPLATES.render("reports.html", &context).unwrap();
 
-async fn report_orgs_handler(_db: Extension<PgPool>) -> Result<Json<OrgList>, AppError> {
-    let mut reponse = OrgList::new();
-
-    let mut dir = tokio::fs::read_dir("reports").await?;
-    while let Some(entry) = dir.next_entry().await? {
-        let file_type = entry.file_type().await?;
-        if file_type.is_dir() {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                reponse.orgs.push(file_name);
-            }
-        }
-    }
-
-    Ok(Json(reponse))
+    Ok(Html::from(output))
 }
 
 async fn root_summary_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
