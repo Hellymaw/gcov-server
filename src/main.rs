@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use axum::{
     extract::{Json, Path},
     http::StatusCode,
@@ -8,7 +9,7 @@ use axum::{
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sqlx::postgres::{PgPool, PgRow};
-use std::{collections::HashMap, vec};
+use std::{collections::HashMap, fs, vec};
 use tera::Tera;
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -103,8 +104,12 @@ async fn main() {
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/summary", get(root_summary_handler))
         .route("/reports", get(reports_page_handler))
+        .route(
+            "/reports/:org/:repo/:branch/:commit",
+            post(report_submission_handler)
+                .get_service(tower_http::services::ServeDir::new("reports")), // this is broken as the path is being stripped out
+        )
         .layer(Extension(db_pool))
-        .nest_service("/reports/", tower_http::services::ServeDir::new("reports"))
         .fallback_service(
             ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html")),
         )
@@ -130,6 +135,29 @@ async fn reports_page_handler(db: Extension<PgPool>) -> Result<Html<String>, App
     let output = TEMPLATES.render("reports.html", &context).unwrap();
 
     Ok(Html::from(output))
+}
+
+async fn report_submission_handler(
+    Path((org, repo, branch, commit)): Path<(String, String, String, String)>,
+    db: Extension<PgPool>,
+) -> Result<(), AppError> {
+    if commit.len() == 0 {
+        return Err(anyhow!("Malformed commit hash").into());
+    }
+
+    db::reports::insert_into_table(&*db, &org, &repo, &branch, &commit).await?;
+
+    let mut path: std::path::PathBuf = ["./reports", &org, &repo, &branch].iter().collect();
+    fs::create_dir_all(&path)?;
+
+    path.push(commit);
+    path.set_extension("html");
+    fs::write(
+        &path,
+        "<!DOCTYPE html><html lang=\"en\"><body>You've made it to the report!!</body></html>",
+    )?;
+
+    Ok(())
 }
 
 async fn root_summary_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
