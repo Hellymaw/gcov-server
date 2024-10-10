@@ -9,6 +9,7 @@
         <td>Repository</td>
         <td>Branch</td>
         <td>Commit</td>
+        <td>Link</td>
         <td>Data...</td>
     </tr>
 {% for report in reports %}
@@ -18,6 +19,7 @@
         <td>{{report.repo}}</td>
         <td>{{report.branch}}</td>
         <td>{{report.commit}}</td>
+        <td><a href="/reports/{{report.org}}/{{report.repo}}/{{report.branch}}/{{report.commit}}.html">report</a></td>
     </tr>
 {% endfor %}
 </table>
