@@ -1,7 +1,7 @@
 {% for summary in summaries %}
 <tr>
     <td>{{summary.org}}</td>
-    <td>{{summary.repo}}</td>
+    <td><a href="/{{summary.org}}/{{summary.repo}}/coverage">{{summary.repo}}</a></td>
     <td>{{summary.coverage.branch}}</td>
     <td>{{summary.coverage.function}}</td>
     <td>{{summary.coverage.line}}</td>
