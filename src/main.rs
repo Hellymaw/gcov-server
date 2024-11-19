@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use axum::{
-    extract::{Json, Path},
+    extract::{Json, Path, Query},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -103,11 +103,11 @@ async fn main() {
     let app = Router::new()
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/summary", get(root_summary_handler))
+        .route("/summaries", get(test_handler))
         .route("/reports", get(reports_page_handler))
         .route(
             "/reports/:org/:repo/:branch/:commit",
-            post(report_submission_handler)
-                .get_service(tower_http::services::ServeDir::new("reports")), // this is broken as the path is being stripped out
+            post(report_submission_handler),
         )
         .layer(Extension(db_pool))
         .fallback_service(
@@ -125,6 +125,82 @@ async fn main() {
     };
 
     axum::serve(listener, app).await.unwrap();
+}
+
+#[derive(Serialize, Debug)]
+struct CoverageNew {
+    branch: f64,
+    function: f64,
+    line: f64,
+}
+
+#[derive(Serialize, Debug)]
+struct Summary {
+    org: String,
+    repo: String,
+    coverage: CoverageNew,
+}
+
+async fn fetch_latest_summaries(
+    db: &PgPool,
+    org: Option<&String>,
+    repo: Option<&String>,
+) -> Vec<Summary> {
+    let mut data = vec![
+        Summary {
+            org: "org1".to_string(),
+            repo: "repo1".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+        Summary {
+            org: "org1".to_string(),
+            repo: "repo2".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+        Summary {
+            org: "org1".to_string(),
+            repo: "repo1".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+    ];
+
+    if let Some(org) = org {
+        data.retain(|x| x.org.contains(org));
+    }
+
+    if let Some(repo) = repo {
+        data.retain(|x| x.repo.contains(repo));
+    }
+
+    data
+}
+
+async fn test_handler(
+    db: Extension<PgPool>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Html<String> {
+    let summaries = fetch_latest_summaries(&*db, params.get("org"), params.get("repo")).await;
+
+    let mut context = tera::Context::new();
+    context.insert("summaries", &summaries);
+
+    let output = TEMPLATES
+        .render("coverage/top_level_summary.html", &context)
+        .unwrap();
+
+    Html::from(output)
 }
 
 async fn reports_page_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {

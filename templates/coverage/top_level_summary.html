@@ -1,0 +1,9 @@
+{% for summary in summaries %}
+<tr>
+    <td>{{summary.org}}</td>
+    <td>{{summary.repo}}</td>
+    <td>{{summary.coverage.branch}}</td>
+    <td>{{summary.coverage.function}}</td>
+    <td>{{summary.coverage.line}}</td>
+</tr>
+{% endfor %}
