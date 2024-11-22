@@ -1,0 +1,9 @@
+{% for report in reports %}
+    <tr>
+        <td>{{report.branch}}</td>
+        <td><a href="{{org}}/{{repo}}/{{report.branch}}/{{report.commit}}/coverage">{{report.commit}}</a></td>
+        <td>{{report.coverage.branch}}</td>
+        <td>{{report.coverage.function}}</td>
+        <td>{{report.coverage.line}}</td>
+    </tr>
+{% endfor %}

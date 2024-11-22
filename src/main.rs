@@ -102,6 +102,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/:org/:repo/summary", post(summary_handler))
+        .route("/:org/:repo/summaries", get(repo_summaries_handler))
+        .route("/:org/:repo/coverage", get(coverage_handler))
         .route("/summary", get(root_summary_handler))
         .route("/summaries", get(test_handler))
         .route("/reports", get(reports_page_handler))
@@ -198,6 +200,87 @@ async fn test_handler(
 
     let output = TEMPLATES
         .render("coverage/top_level_summary.html", &context)
+        .unwrap();
+
+    Html::from(output)
+}
+
+#[derive(Serialize, Debug)]
+struct CoverageReport {
+    branch: String,
+    commit: String,
+    coverage: CoverageNew,
+}
+
+async fn fetch_repo_coverage_reports(
+    _org: &str,
+    _repo: &str,
+    branch: Option<&String>,
+) -> Vec<CoverageReport> {
+    let mut data = vec![
+        CoverageReport {
+            branch: "feature1".to_string(),
+            commit: "qwe".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+        CoverageReport {
+            branch: "feature1".to_string(),
+            commit: "zxc".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+        CoverageReport {
+            branch: "feature2".to_string(),
+            commit: "asd".to_string(),
+            coverage: CoverageNew {
+                branch: 10.0,
+                function: 20.1,
+                line: 30.5,
+            },
+        },
+    ];
+
+    if let Some(branch) = branch {
+        data.retain(|x| x.branch.contains(branch));
+    }
+
+    data
+}
+
+async fn coverage_handler(
+    db: Extension<PgPool>,
+    Path((org, repo)): Path<(String, String)>,
+) -> Html<String> {
+    let mut context = tera::Context::new();
+    context.insert("repo", &repo);
+    context.insert("org", &org);
+
+    let output = TEMPLATES.render("coverage/repo.html", &context).unwrap();
+
+    Html::from(output)
+}
+
+async fn repo_summaries_handler(
+    db: Extension<PgPool>,
+    Path((org, repo)): Path<(String, String)>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Html<String> {
+    let reports = fetch_repo_coverage_reports(&org, &repo, params.get("branch")).await;
+
+    let mut context = tera::Context::new();
+    context.insert("reports", &reports);
+    context.insert("repo", &repo);
+    context.insert("org", &org);
+
+    let output = TEMPLATES
+        .render("coverage/repo_summary.html", &context)
         .unwrap();
 
     Html::from(output)
