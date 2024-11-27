@@ -23,6 +23,7 @@ pub mod db;
 use db::summary::{CoverageSummary, SummaryTableEntry};
 
 pub mod gcovr;
+pub mod gitea;
 
 const MAX_LOG_FILES: usize = 48;
 
@@ -139,7 +140,7 @@ struct FileTemplate<'a> {
 }
 
 async fn test(db: Extension<PgPool>) -> Html<String> {
-    let file_data = "some\nfile\nwith\ndata";
+    let file_data = gitea::get_file(std::path::Path::new(".")).await;
 
     let mut entry = gcovr::fake_file_entry();
     entry
@@ -149,9 +150,9 @@ async fn test(db: Extension<PgPool>) -> Html<String> {
     let source_lines: Vec<FileTemplate> = file_data
         .lines()
         .zip(entry.lines)
-        .map(|x| FileTemplate {
-            source: x.0,
-            line_number: x.1.line_number,
+        .map(|(source, entry)| FileTemplate {
+            source,
+            line_number: entry.line_number,
         })
         .collect();
 
