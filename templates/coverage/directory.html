@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+</head>
+
+<body>
+<table>
+    <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Branch percent</th>
+    </tr>
+    {% for file in files %}
+    <tr>
+        <td>{{file.t}}</td>
+        <td><a href="{{file.name}}/coverage">{{file.name}}</td>
+        <td>66%</td>
+    </tr>
+    {% endfor %}
+</table>
+</body>
+</html>
