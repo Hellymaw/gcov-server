@@ -22,6 +22,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod db;
 use db::summary::{CoverageSummary, SummaryTableEntry};
 
+pub mod gcovr;
+
 const MAX_LOG_FILES: usize = 48;
 
 struct AppError(anyhow::Error);
@@ -104,6 +106,7 @@ async fn main() {
         .route("/:org/:repo/summary", post(summary_handler))
         .route("/:org/:repo/summaries", get(repo_summaries_handler))
         .route("/:org/:repo/coverage", get(coverage_handler))
+        .route("/test", get(test))
         .route("/summary", get(root_summary_handler))
         .route("/summaries", get(test_handler))
         .route("/reports", get(reports_page_handler))
@@ -127,6 +130,37 @@ async fn main() {
     };
 
     axum::serve(listener, app).await.unwrap();
+}
+
+#[derive(Serialize, Debug)]
+struct FileTemplate<'a> {
+    source: &'a str,
+    line_number: usize,
+}
+
+async fn test(db: Extension<PgPool>) -> Html<String> {
+    let file_data = "some\nfile\nwith\ndata";
+
+    let mut entry = gcovr::fake_file_entry();
+    entry
+        .lines
+        .sort_by(|a, b| a.line_number.cmp(&b.line_number));
+
+    let source_lines: Vec<FileTemplate> = file_data
+        .lines()
+        .zip(entry.lines)
+        .map(|x| FileTemplate {
+            source: x.0,
+            line_number: x.1.line_number,
+        })
+        .collect();
+
+    let mut context = tera::Context::new();
+    context.insert("source_lines", &source_lines);
+
+    let output = TEMPLATES.render("coverage/file.html", &context).unwrap();
+
+    Html::from(output)
 }
 
 #[derive(Serialize, Debug)]
