@@ -22,49 +22,18 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub mod db;
 use db::summary::{CoverageSummary, SummaryTableEntry};
 
+pub mod app;
 pub mod gcovr;
 pub mod gitea;
 
+use app::TEMPLATES;
+
 const MAX_LOG_FILES: usize = 48;
-
-struct AppError(anyhow::Error);
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", self.0),
-        )
-            .into_response()
-    }
-}
-
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
-}
 
 #[derive(Serialize, Debug)]
 struct GiteaOrg {
     name: String,
     repos: Vec<SummaryTableEntry>,
-}
-
-lazy_static! {
-    static ref TEMPLATES: Tera = {
-        let tera = match Tera::new("templates/**/*") {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("Parsing error(s): {}", e);
-                ::std::process::exit(1);
-            }
-        };
-        tera
-    };
 }
 
 fn configure_logging() -> Result<(), tracing_appender::rolling::InitError> {
@@ -104,7 +73,11 @@ async fn main() {
     };
 
     let app = Router::new()
-        .route("/:org/:repo/summary", post(summary_handler))
+        .route("/", get(app::root_handler))
+        .route("/:owner", get(app::owner_handler))
+        .route("/:owner/:repo", get(app::repo_handler))
+        .route("/:owner/:repo/tree/*path", get(app::tree_handler))
+        .route("/:owner/:repo/blob/*path", get(app::blob_handler))
         .route("/:org/:repo/summaries", get(repo_summaries_handler))
         .route("/:org/:repo/coverage", get(coverage_handler))
         .route(
@@ -115,17 +88,8 @@ async fn main() {
             "/:org/:repo/:commit/:file/coverage",
             get(file_coverage_handler),
         )
-        .route("/summary", get(root_summary_handler))
         .route("/summaries", get(test_handler))
-        .route("/reports", get(reports_page_handler))
-        .route(
-            "/reports/:org/:repo/:branch/:commit",
-            post(report_submission_handler),
-        )
         .layer(Extension(db_pool))
-        .fallback_service(
-            ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html")),
-        )
         .layer(TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:1001".to_string());
@@ -254,13 +218,16 @@ async fn test_handler(
     db: Extension<PgPool>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Html<String> {
-    let summaries = fetch_latest_summaries(&*db, params.get("org"), params.get("repo")).await;
+    let root = params.get("root").is_some_and(|x| x.len() > 0);
+
+    let summaries = fetch_latest_summaries(&*db, params.get("owner"), params.get("repo")).await;
 
     let mut context = tera::Context::new();
     context.insert("summaries", &summaries);
+    context.insert("root", &root);
 
     let output = TEMPLATES
-        .render("coverage/top_level_summary.html", &context)
+        .render("coverage/root_owner.html", &context)
         .unwrap();
 
     Html::from(output)
@@ -345,78 +312,4 @@ async fn repo_summaries_handler(
         .unwrap();
 
     Html::from(output)
-}
-
-async fn reports_page_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
-    let reports = db::reports::fetch_table(&db).await?;
-    let mut context = tera::Context::new();
-    context.insert("reports", &reports);
-
-    let output = TEMPLATES.render("reports.html", &context).unwrap();
-
-    Ok(Html::from(output))
-}
-
-async fn report_submission_handler(
-    Path((org, repo, branch, commit)): Path<(String, String, String, String)>,
-    db: Extension<PgPool>,
-) -> Result<(), AppError> {
-    if commit.len() == 0 {
-        return Err(anyhow!("Malformed commit hash").into());
-    }
-
-    db::reports::insert_into_table(&*db, &org, &repo, &branch, &commit).await?;
-
-    let mut path: std::path::PathBuf = ["./reports", &org, &repo, &branch].iter().collect();
-    fs::create_dir_all(&path)?;
-
-    path.push(commit);
-    path.set_extension("html");
-    fs::write(
-        &path,
-        "<!DOCTYPE html><html lang=\"en\"><body>You've made it to the report!!</body></html>",
-    )?;
-
-    Ok(())
-}
-
-async fn root_summary_handler(db: Extension<PgPool>) -> Result<Html<String>, AppError> {
-    let orgs = if let Ok(resp) = db::summary::fetch_table(&*db).await {
-        let mut orgs: HashMap<String, Vec<SummaryTableEntry>> = HashMap::new();
-        for entry in resp {
-            if let Some(vals) = orgs.get_mut(&entry.org) {
-                vals.push(entry);
-            } else {
-                orgs.insert(entry.org.clone(), vec![entry]);
-            }
-        }
-
-        let orgs: Vec<GiteaOrg> = orgs
-            .into_iter()
-            .map(|(k, v)| GiteaOrg { name: k, repos: v })
-            .collect();
-
-        tracing::error!("{:?}", orgs);
-
-        orgs
-    } else {
-        Vec::new()
-    };
-
-    let mut context = tera::Context::new();
-    context.insert("orgs", &orgs);
-
-    let output = TEMPLATES.render("base.html", &context)?;
-
-    Ok(Html::from(output))
-}
-
-async fn summary_handler(
-    db: Extension<PgPool>,
-    Path((org, repo)): Path<(String, String)>,
-    Json(payload): Json<CoverageSummary>,
-) -> Result<(), AppError> {
-    db::summary::insert_into_table(&*db, &org, &repo, &payload)
-        .await
-        .map_err(|e| e.into())
 }

@@ -1,17 +1,26 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    {% block head %}
+    <title>{% block title %}Coverage Server{% endblock title %}</title>
+    {% endblock head %}
+</head>
+<script src="https://unpkg.com/htmx.org@2.0.3"></script>
 <body>
-<h1>Coverage Summary</h1>
-<ul>
-    {% for org in orgs %}
-    <li><strong>{{org.name}}</strong>
-        <ul>
-        {% for repo in org.repos %}
-            <li>{{repo.repo}} - {{repo.coverage["branch_percent"]}} - <a href="/reports/{{org.name}}/{{repo.repo}}">reports</a></li>
-        {% endfor %}
-        </ul>
-    </li>
-    {% endfor %}
-</ul>
+    {% block nav %}
+    <nav>
+        <ol>
+            <li><a href="/">Home</a></li>
+        </ol>
+    </nav>
+    {% endblock nav %}
+    <div id="content">{% block content %}{% endblock content %}</div>
+    <div id="footer">
+        {% block footer %}
+        Some footer
+        {% endblock footer %}
+    </div>
 </body>
+
 </html>

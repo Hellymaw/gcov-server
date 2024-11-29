@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Coverage Summaries</h1>
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2">Organisation</th>
+                <th rowspan="2">Repository</th>
+                <th colspan="3">Latest Coverage</th>
+            </tr>
+            <tr>
+                <th>Branch</th>
+                <th>Function</th>
+                <th>Line</th>
+            </tr>
+            <tr hx-get="/summaries?root=1" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries">
+                <td><input type="text" name="owner" value=""></td>
+                <td><input type="text" name="repo" value=""></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </thead>
+        <tbody id="summaries">
+        </tbody>
+    </table>
+{% endblock content %}
