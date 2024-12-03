@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::path::Path;
+use std::{iter::Sum, path::Path};
 
 pub async fn get_file(path: &Path) -> String {
     let file_data = "some\nfile\nwith\ndata";
@@ -8,20 +8,32 @@ pub async fn get_file(path: &Path) -> String {
 }
 
 #[derive(Debug, Serialize)]
+pub struct Summary(f64, f64, f64);
+
+#[derive(Debug, Serialize)]
 pub struct FileType {
-    t: String,
-    name: String,
+    pub r#type: String,
+    pub name: String,
+    pub path: String,
+    pub summary: Summary,
+    pub is_dir: bool,
 }
 
 pub async fn get_repo_contents(org: &str, repo: &str, commit: &str) -> Vec<FileType> {
     vec![
         FileType {
-            t: "file".to_string(),
+            r#type: "file".to_string(),
             name: "test".to_string(),
+            path: "/test".to_string(),
+            summary: Summary(30.2, 30.2, 30.2),
+            is_dir: false,
         },
         FileType {
-            t: "dir".to_string(),
+            r#type: "dir".to_string(),
             name: "dir".to_string(),
+            path: "/dir".to_string(),
+            summary: Summary(30.2, 30.2, 30.2),
+            is_dir: true,
         },
     ]
 }

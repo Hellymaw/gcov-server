@@ -1,7 +1,7 @@
 {% for report in reports %}
     <tr>
         <td>{{report.branch}}</td>
-        <td><a href="/{{owner}}/{{repo}}/{{report.commit}}/coverage">{{report.commit}}</a></td>
+        <td><a href="/{{owner}}/{{repo}}/tree/{{report.commit}}">{{report.commit}}</a></td>
         <td>{{report.coverage.branch}}</td>
         <td>{{report.coverage.function}}</td>
         <td>{{report.coverage.line}}</td>

@@ -6,6 +6,9 @@ use axum::{
 use sqlx::postgres::PgPool;
 use std::collections::HashMap;
 use tera::{Context, Tera};
+use tracing::info;
+
+use crate::gitea;
 
 pub struct AppError(anyhow::Error);
 
@@ -59,9 +62,23 @@ pub async fn repo_handler(
 
 pub async fn tree_handler(
     _db: Extension<PgPool>,
-    Path((_owner, _repo, _path)): Path<(String, String, Vec<String>)>,
-) -> Html<String> {
-    todo!()
+    Path((owner, repo, path)): Path<(String, String, String)>,
+) -> Result<Html<String>, AppError> {
+    let path: Vec<&str> = path.split('/').collect();
+
+    let commit = path.first().ok_or(anyhow::anyhow!("Need a commit SHA!"))?;
+
+    let repo_contents = gitea::get_repo_contents(&owner, &repo, commit).await;
+
+    info!("{:?}", repo_contents);
+
+    let mut context = tera::Context::new();
+    context.insert("owner", &owner);
+    context.insert("repo", &repo);
+    context.insert("commit", commit);
+    context.insert("files", &repo_contents);
+
+    Ok(Html::from(TEMPLATES.render("tree.html", &context).unwrap()))
 }
 
 pub async fn blob_handler(
