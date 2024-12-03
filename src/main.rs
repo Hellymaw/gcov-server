@@ -79,15 +79,6 @@ async fn main() {
         .route("/:owner/:repo/tree/*path", get(app::tree_handler))
         .route("/:owner/:repo/blob/*path", get(app::blob_handler))
         .route("/:org/:repo/summaries", get(repo_summaries_handler))
-        .route("/:org/:repo/coverage", get(coverage_handler))
-        .route(
-            "/:org/:repo/:commit/coverage",
-            get(directory_coverage_handler),
-        )
-        .route(
-            "/:org/:repo/:commit/:file/coverage",
-            get(file_coverage_handler),
-        )
         .route("/summaries", get(test_handler))
         .layer(Extension(db_pool))
         .layer(TraceLayer::new_for_http());
@@ -102,56 +93,6 @@ async fn main() {
     };
 
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn directory_coverage_handler(
-    db: Extension<PgPool>,
-    Path((org, repo, commit)): Path<(String, String, String)>,
-) -> Html<String> {
-    let repo_contents = gitea::get_repo_contents(&org, &repo, &commit).await;
-
-    let mut context = tera::Context::new();
-    context.insert("files", &repo_contents);
-
-    let output = TEMPLATES
-        .render("coverage/directory.html", &context)
-        .unwrap();
-
-    Html::from(output)
-}
-
-#[derive(Serialize, Debug)]
-struct FileTemplate<'a> {
-    source: &'a str,
-    line_number: usize,
-}
-
-async fn file_coverage_handler(
-    db: Extension<PgPool>,
-    Path((org, repo, commit, file)): Path<(String, String, String, String)>,
-) -> Html<String> {
-    let file_data = gitea::get_file(std::path::Path::new(".")).await;
-
-    let mut entry = gcovr::fake_file_entry();
-    entry
-        .lines
-        .sort_by(|a, b| a.line_number.cmp(&b.line_number));
-
-    let source_lines: Vec<FileTemplate> = file_data
-        .lines()
-        .zip(entry.lines)
-        .map(|(source, entry)| FileTemplate {
-            source,
-            line_number: entry.line_number,
-        })
-        .collect();
-
-    let mut context = tera::Context::new();
-    context.insert("source_lines", &source_lines);
-
-    let output = TEMPLATES.render("coverage/file.html", &context).unwrap();
-
-    Html::from(output)
 }
 
 #[derive(Serialize, Debug)]
@@ -280,19 +221,6 @@ async fn fetch_repo_coverage_reports(
     }
 
     data
-}
-
-async fn coverage_handler(
-    db: Extension<PgPool>,
-    Path((org, repo)): Path<(String, String)>,
-) -> Html<String> {
-    let mut context = tera::Context::new();
-    context.insert("repo", &repo);
-    context.insert("org", &org);
-
-    let output = TEMPLATES.render("coverage/repo.html", &context).unwrap();
-
-    Html::from(output)
 }
 
 async fn repo_summaries_handler(
