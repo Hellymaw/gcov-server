@@ -143,7 +143,7 @@ pub mod tmp {
         context.insert("root", &root);
 
         let output = TEMPLATES
-            .render("coverage/root_owner.html", &context)
+            .render("summary/root_owner.html", &context)
             .unwrap();
 
         Html::from(output)
@@ -162,9 +162,7 @@ pub mod tmp {
         context.insert("repo", &repo);
         context.insert("owner", &owner);
 
-        let output = TEMPLATES
-            .render("coverage/repo_summary.html", &context)
-            .unwrap();
+        let output = TEMPLATES.render("summary/repo.html", &context).unwrap();
 
         Html::from(output)
     }
