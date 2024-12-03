@@ -3,11 +3,13 @@ use axum::{
     response::Html,
     Extension,
 };
+use serde::Serialize;
 use sqlx::postgres::PgPool;
 use std::collections::HashMap;
 use tera::{Context, Tera};
 use tracing::info;
 
+use crate::gcovr;
 use crate::gitea;
 
 pub struct AppError(anyhow::Error);
@@ -29,6 +31,12 @@ where
     fn from(err: E) -> Self {
         Self(err.into())
     }
+}
+
+#[derive(Serialize, Debug)]
+struct FileTemplate<'a> {
+    source: &'a str,
+    line_number: usize,
 }
 
 lazy_static::lazy_static! {
@@ -83,7 +91,30 @@ pub async fn tree_handler(
 
 pub async fn blob_handler(
     _db: Extension<PgPool>,
-    Path((_owner, _repo, _path)): Path<(String, String, Vec<String>)>,
-) -> Html<String> {
-    todo!()
+    Path((_owner, _repo, path)): Path<(String, String, String)>,
+) -> Result<Html<String>, AppError> {
+    let (_commit, path) = path
+        .split_once('/')
+        .ok_or(anyhow::anyhow!("Need a filepath!"))?;
+
+    let file_data = gitea::get_file(&std::path::Path::new(path)).await;
+
+    let mut entry = gcovr::fake_file_entry();
+    entry
+        .lines
+        .sort_by(|a, b| a.line_number.cmp(&b.line_number));
+
+    let source_lines: Vec<FileTemplate> = file_data
+        .lines()
+        .zip(entry.lines)
+        .map(|(source, entry)| FileTemplate {
+            source,
+            line_number: entry.line_number,
+        })
+        .collect();
+
+    let mut context = tera::Context::new();
+    context.insert("source_lines", &source_lines);
+
+    Ok(Html::from(TEMPLATES.render("blob.html", &context)?))
 }

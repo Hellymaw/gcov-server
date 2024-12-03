@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<table>
+    <tr>
+        <th>Line</th>
+        <th>Branch</th>
+        <th>Exec</th>
+        <th>Source</th>
+    </tr>
+    {% for line in source_lines %}
+    <tr>
+        <td>{{line.line_number}}</td>
+        <td>taken/not</td>
+        <td>exec</td>
+        <td>{{line.source}}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock content %}
