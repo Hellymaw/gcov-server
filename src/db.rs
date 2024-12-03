@@ -235,3 +235,117 @@ pub mod reports {
         Ok(())
     }
 }
+
+pub mod tmp {
+    use serde::Serialize;
+    use sqlx::PgPool;
+
+    #[derive(Serialize, Debug)]
+    pub struct CoverageNew {
+        pub branch: f64,
+        pub function: f64,
+        pub line: f64,
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct Summary {
+        pub org: String,
+        pub repo: String,
+        pub coverage: CoverageNew,
+    }
+
+    pub async fn fetch_latest_summaries(
+        db: &PgPool,
+        org: Option<&String>,
+        repo: Option<&String>,
+    ) -> Vec<Summary> {
+        let mut data = vec![
+            Summary {
+                org: "org1".to_string(),
+                repo: "repo1".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+            Summary {
+                org: "org1".to_string(),
+                repo: "repo2".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+            Summary {
+                org: "org1".to_string(),
+                repo: "repo1".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+        ];
+
+        if let Some(org) = org {
+            data.retain(|x| x.org.contains(org));
+        }
+
+        if let Some(repo) = repo {
+            data.retain(|x| x.repo.contains(repo));
+        }
+
+        data
+    }
+
+    #[derive(Serialize, Debug)]
+    pub struct CoverageReport {
+        pub branch: String,
+        pub commit: String,
+        pub coverage: CoverageNew,
+    }
+
+    pub async fn fetch_repo_coverage_reports(
+        _org: &str,
+        _repo: &str,
+        branch: Option<&String>,
+    ) -> Vec<CoverageReport> {
+        let mut data = vec![
+            CoverageReport {
+                branch: "feature1".to_string(),
+                commit: "qwe".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+            CoverageReport {
+                branch: "feature1".to_string(),
+                commit: "zxc".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+            CoverageReport {
+                branch: "feature2".to_string(),
+                commit: "asd".to_string(),
+                coverage: CoverageNew {
+                    branch: 10.0,
+                    function: 20.1,
+                    line: 30.5,
+                },
+            },
+        ];
+
+        if let Some(branch) = branch {
+            data.retain(|x| x.branch.contains(branch));
+        }
+
+        data
+    }
+}

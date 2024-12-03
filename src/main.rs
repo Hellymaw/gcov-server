@@ -1,40 +1,16 @@
-use anyhow::anyhow;
-use axum::{
-    extract::{Json, Path, Query},
-    http::StatusCode,
-    response::{Html, IntoResponse, Response},
-    routing::{get, post},
-    Extension, Router,
-};
-use lazy_static::lazy_static;
-use serde::Serialize;
-use sqlx::postgres::{PgPool, PgRow};
-use std::{collections::HashMap, fs, vec};
-use tera::Tera;
-use tower_http::{
-    services::{ServeDir, ServeFile},
-    trace::TraceLayer,
-};
-use tracing;
+use axum::{routing::get, Extension, Router};
+use tower_http::trace::TraceLayer;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-pub mod db;
-use db::summary::{CoverageSummary, SummaryTableEntry};
-
-pub mod app;
-pub mod gcovr;
-pub mod gitea;
+mod app;
+mod db;
+mod gcovr;
+mod gitea;
 
 use app::TEMPLATES;
 
 const MAX_LOG_FILES: usize = 48;
-
-#[derive(Serialize, Debug)]
-struct GiteaOrg {
-    name: String,
-    repos: Vec<SummaryTableEntry>,
-}
 
 fn configure_logging() -> Result<(), tracing_appender::rolling::InitError> {
     let log_dir = std::env::var("LOG_DIR").unwrap_or("./logs".to_string());
@@ -78,8 +54,11 @@ async fn main() {
         .route("/:owner/:repo", get(app::repo_handler))
         .route("/:owner/:repo/tree/*path", get(app::tree_handler))
         .route("/:owner/:repo/blob/*path", get(app::blob_handler))
-        .route("/:org/:repo/summaries", get(repo_summaries_handler))
-        .route("/summaries", get(test_handler))
+        .route(
+            "/:org/:repo/summaries",
+            get(app::tmp::repo_summaries_handler),
+        )
+        .route("/summaries", get(app::tmp::root_summary_handler))
         .layer(Extension(db_pool))
         .layer(TraceLayer::new_for_http());
 
@@ -93,151 +72,4 @@ async fn main() {
     };
 
     axum::serve(listener, app).await.unwrap();
-}
-
-#[derive(Serialize, Debug)]
-struct CoverageNew {
-    branch: f64,
-    function: f64,
-    line: f64,
-}
-
-#[derive(Serialize, Debug)]
-struct Summary {
-    org: String,
-    repo: String,
-    coverage: CoverageNew,
-}
-
-async fn fetch_latest_summaries(
-    db: &PgPool,
-    org: Option<&String>,
-    repo: Option<&String>,
-) -> Vec<Summary> {
-    let mut data = vec![
-        Summary {
-            org: "org1".to_string(),
-            repo: "repo1".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-        Summary {
-            org: "org1".to_string(),
-            repo: "repo2".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-        Summary {
-            org: "org1".to_string(),
-            repo: "repo1".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-    ];
-
-    if let Some(org) = org {
-        data.retain(|x| x.org.contains(org));
-    }
-
-    if let Some(repo) = repo {
-        data.retain(|x| x.repo.contains(repo));
-    }
-
-    data
-}
-
-async fn test_handler(
-    db: Extension<PgPool>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Html<String> {
-    let root = params.get("root").is_some_and(|x| x.len() > 0);
-
-    let summaries = fetch_latest_summaries(&*db, params.get("owner"), params.get("repo")).await;
-
-    let mut context = tera::Context::new();
-    context.insert("summaries", &summaries);
-    context.insert("root", &root);
-
-    let output = TEMPLATES
-        .render("coverage/root_owner.html", &context)
-        .unwrap();
-
-    Html::from(output)
-}
-
-#[derive(Serialize, Debug)]
-struct CoverageReport {
-    branch: String,
-    commit: String,
-    coverage: CoverageNew,
-}
-
-async fn fetch_repo_coverage_reports(
-    _org: &str,
-    _repo: &str,
-    branch: Option<&String>,
-) -> Vec<CoverageReport> {
-    let mut data = vec![
-        CoverageReport {
-            branch: "feature1".to_string(),
-            commit: "qwe".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-        CoverageReport {
-            branch: "feature1".to_string(),
-            commit: "zxc".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-        CoverageReport {
-            branch: "feature2".to_string(),
-            commit: "asd".to_string(),
-            coverage: CoverageNew {
-                branch: 10.0,
-                function: 20.1,
-                line: 30.5,
-            },
-        },
-    ];
-
-    if let Some(branch) = branch {
-        data.retain(|x| x.branch.contains(branch));
-    }
-
-    data
-}
-
-async fn repo_summaries_handler(
-    db: Extension<PgPool>,
-    Path((owner, repo)): Path<(String, String)>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Html<String> {
-    let reports = fetch_repo_coverage_reports(&owner, &repo, params.get("branch")).await;
-
-    let mut context = tera::Context::new();
-    context.insert("reports", &reports);
-    context.insert("repo", &repo);
-    context.insert("owner", &owner);
-
-    let output = TEMPLATES
-        .render("coverage/repo_summary.html", &context)
-        .unwrap();
-
-    Html::from(output)
 }

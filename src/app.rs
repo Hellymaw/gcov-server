@@ -118,3 +118,54 @@ pub async fn blob_handler(
 
     Ok(Html::from(TEMPLATES.render("blob.html", &context)?))
 }
+
+pub mod tmp {
+    use axum::extract::{Path, Query};
+    use axum::response::Html;
+    use axum::Extension;
+    use sqlx::PgPool;
+    use std::collections::HashMap;
+
+    use crate::db;
+    use crate::TEMPLATES;
+
+    pub async fn root_summary_handler(
+        db: Extension<PgPool>,
+        Query(params): Query<HashMap<String, String>>,
+    ) -> Html<String> {
+        let root = params.get("root").is_some_and(|x| x.len() > 0);
+
+        let summaries =
+            db::tmp::fetch_latest_summaries(&*db, params.get("owner"), params.get("repo")).await;
+
+        let mut context = tera::Context::new();
+        context.insert("summaries", &summaries);
+        context.insert("root", &root);
+
+        let output = TEMPLATES
+            .render("coverage/root_owner.html", &context)
+            .unwrap();
+
+        Html::from(output)
+    }
+
+    pub async fn repo_summaries_handler(
+        _db: Extension<PgPool>,
+        Path((owner, repo)): Path<(String, String)>,
+        Query(params): Query<HashMap<String, String>>,
+    ) -> Html<String> {
+        let reports =
+            db::tmp::fetch_repo_coverage_reports(&owner, &repo, params.get("branch")).await;
+
+        let mut context = tera::Context::new();
+        context.insert("reports", &reports);
+        context.insert("repo", &repo);
+        context.insert("owner", &owner);
+
+        let output = TEMPLATES
+            .render("coverage/repo_summary.html", &context)
+            .unwrap();
+
+        Html::from(output)
+    }
+}
