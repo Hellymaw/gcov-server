@@ -47,10 +47,14 @@ pub async fn owner_handler(
 
 pub async fn repo_handler(
     _db: Extension<PgPool>,
-    Path((_owner, _repo)): Path<(String, String)>,
+    Path((owner, repo)): Path<(String, String)>,
     Query(_params): Query<HashMap<String, String>>,
-) -> Html<String> {
-    todo!()
+) -> Result<Html<String>, AppError> {
+    let mut context = tera::Context::new();
+    context.insert("repo", &repo);
+    context.insert("owner", &owner);
+
+    Ok(Html::from(TEMPLATES.render("repo.html", &context)?))
 }
 
 pub async fn tree_handler(

@@ -297,15 +297,15 @@ async fn coverage_handler(
 
 async fn repo_summaries_handler(
     db: Extension<PgPool>,
-    Path((org, repo)): Path<(String, String)>,
+    Path((owner, repo)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Html<String> {
-    let reports = fetch_repo_coverage_reports(&org, &repo, params.get("branch")).await;
+    let reports = fetch_repo_coverage_reports(&owner, &repo, params.get("branch")).await;
 
     let mut context = tera::Context::new();
     context.insert("reports", &reports);
     context.insert("repo", &repo);
-    context.insert("org", &org);
+    context.insert("owner", &owner);
 
     let output = TEMPLATES
         .render("coverage/repo_summary.html", &context)
