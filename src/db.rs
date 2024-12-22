@@ -6,10 +6,13 @@ use thiserror::Error;
 
 lazy_static! {
     static ref CONNECTION_URL: String = {
-        let pg_password = fetch_env_var_exiting("POSTGRES_PASSWORD");
-        let pg_db = fetch_env_var_exiting("POSTGRES_DB");
+        let user = fetch_env_var_exiting("POSTGRES_USER");
+        let password = fetch_env_var_exiting("POSTGRES_PASSWORD");
+        let db = fetch_env_var_exiting("POSTGRES_DB");
+        let host = fetch_env_var_exiting("POSTGRES_HOST");
+        let port = fetch_env_var_exiting("POSTGRES_PORT");
 
-        format!("postgres://postgres:{pg_password}@db/{pg_db}")
+        format!("postgres://{user}:{password}@{host}:{port}/{db}")
     };
 }
 
