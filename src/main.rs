@@ -62,7 +62,7 @@ async fn main() {
         .layer(Extension(db_pool))
         .layer(TraceLayer::new_for_http());
 
-    let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:1001".to_string());
+    let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:3003".to_string());
     let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
         Ok(l) => l,
         Err(e) => {
