@@ -114,9 +114,9 @@ pub mod summary {
     pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS summary (
-                        insert_time timestamptz, 
-                        org varchar, 
-                        repo varchar, 
+                        insert_time timestamptz,
+                        org varchar,
+                        repo varchar,
                         coverage jsonb
                     );"#,
         )
