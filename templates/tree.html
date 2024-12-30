@@ -16,15 +16,15 @@
         <tbody>
             {% for file in files %}
             <tr>
-                <td>{{file.type}}</td>
+                <td>placeholder3</td>
                 {% if file.is_dir %}
-                    <td><a href="/{{owner}}/{{repo}}/tree/{{commit}}{{file.path}}">{{file.name}}</td>
+                    <td><a href="/{{owner}}/{{repo}}/tree/{{commit}}{{path}}{{file.name}}">{{file.name}}</td>
                 {% else %}
-                    <td><a href="/{{owner}}/{{repo}}/blob/{{commit}}{{file.path}}">{{file.name}}</td>
+                    <td><a href="/{{owner}}/{{repo}}/blob/{{commit}}{{path}}{{file.name}}">{{file.name}}</td>
                 {% endif %}
-                <td>{{file.summary.0}}</td>
-                <td>{{file.summary.1}}</td>
-                <td>{{file.summary.2}}</td>
+                <td>placeholder0</td>
+                <td>placeholder1</td>
+                <td>placeholder2</td>
             </tr>
             {% endfor %}
         </tbody>

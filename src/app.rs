@@ -72,21 +72,43 @@ pub async fn tree_handler(
     _db: Extension<PgPool>,
     Path((owner, repo, path)): Path<(String, String, String)>,
 ) -> Result<Html<String>, AppError> {
-    let path: Vec<&str> = path.split('/').collect();
+    let (commit, path) = path
+        .split_once('/')
+        .ok_or_else(|| anyhow::anyhow!("A filepath and commit SHA is required!"))?;
 
-    let commit = path.first().ok_or(anyhow::anyhow!("Need a commit SHA!"))?;
+    let path = "/".to_string() + path;
 
-    let repo_contents = gitea::get_repo_contents(&owner, &repo, commit).await;
-
+    let repo_contents =
+        gitea::repository::get_repository_entries(&owner, &repo, Some(commit), path.as_str())
+            .await?;
     info!("{:?}", repo_contents);
 
-    let mut context = tera::Context::new();
-    context.insert("owner", &owner);
-    context.insert("repo", &repo);
-    context.insert("commit", commit);
-    context.insert("files", &repo_contents);
+    #[derive(Serialize)]
+    struct Test {
+        is_dir: bool,
+        name: String,
+    }
 
-    Ok(Html::from(TEMPLATES.render("tree.html", &context).unwrap()))
+    if let gitea::repository::Entry::Directory(contents) = repo_contents {
+        let contents: Vec<Test> = contents
+            .iter()
+            .map(|c| Test {
+                is_dir: matches!(c, gitea::repository::DirectoryEntries::Directory(_)),
+                name: c.name().to_string(),
+            })
+            .collect();
+
+        let mut context = tera::Context::new();
+        context.insert("owner", &owner);
+        context.insert("repo", &repo);
+        context.insert("commit", commit);
+        context.insert("path", &path);
+        context.insert("files", &contents);
+
+        Ok(Html::from(TEMPLATES.render("tree.html", &context).unwrap()))
+    } else {
+        Err(anyhow::anyhow!("Not a valid path!").into())
+    }
 }
 
 pub async fn blob_handler(

@@ -46,9 +46,9 @@ pub async fn get_repo_contents(_org: &str, _repo: &str, _commit: &str) -> Vec<Fi
 pub mod repository {
     use crate::gitea::GITEA_API_KEY;
     use base64::{prelude::BASE64_STANDARD, Engine as _};
-    use serde::{de, Deserialize};
+    use serde::{de, Deserialize, Serialize};
 
-    #[derive(Debug, Deserialize)]
+    #[derive(Debug, Deserialize, Serialize)]
     #[serde(rename_all = "lowercase", tag = "type", content = "name")]
     pub enum DirectoryEntries {
         #[serde(rename = "dir")]
