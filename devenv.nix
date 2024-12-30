@@ -1,4 +1,4 @@
-{ pkgs, lib, config, inputs, ... }:
+{ pkgs, ... }:
 
 rec {
   env.POSTGRES_USER = "postgres";
@@ -6,10 +6,15 @@ rec {
   env.POSTGRES_DB = "db";
   env.POSTGRES_HOST = "localhost";
   env.POSTGRES_PORT = 5432;
+  env.RUST_LOG="info";
 
-  packages = [ pkgs.git ];
+  packages = [ pkgs.git pkgs.docker pkgs.openssl ];
 
   languages.rust.enable = true;
+
+  processes = {
+    gitea.exec = "cd dev/gitea; docker compose up";
+  };
 
   services.postgres = {
     enable = true;
