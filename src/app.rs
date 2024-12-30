@@ -33,10 +33,19 @@ where
     }
 }
 
+#[derive(Debug, Serialize)]
+struct FileBranchTemplate {
+    excluded: bool,
+    count: usize,
+}
+
 #[derive(Serialize, Debug)]
 struct FileTemplate<'a> {
     source: &'a str,
     line_number: usize,
+    linebranchtaken: usize,
+    linebranchtotal: usize,
+    branches: Vec<FileBranchTemplate>,
 }
 
 lazy_static::lazy_static! {
@@ -135,9 +144,29 @@ pub async fn blob_handler(
         let source_lines: Vec<FileTemplate> = content
             .lines()
             .zip(entry.lines)
-            .map(|(source, entry)| FileTemplate {
-                source,
-                line_number: entry.line_number,
+            .map(|(source, entry)| {
+                let mut branches = Vec::<FileBranchTemplate>::new();
+                let mut branches_taken = 0;
+                let mut total_branches = 0;
+                for branch in entry.branches {
+                    total_branches += 1;
+                    if branch.count > 0 {
+                        branches_taken += 1;
+                    }
+
+                    branches.push(FileBranchTemplate {
+                        excluded: false,
+                        count: branch.count,
+                    });
+                }
+
+                FileTemplate {
+                    source,
+                    line_number: entry.line_number,
+                    linebranchtaken: branches_taken,
+                    linebranchtotal: total_branches,
+                    branches,
+                }
             })
             .collect();
 

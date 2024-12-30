@@ -1,21 +1,36 @@
 {% extends "base.html" %}
 {% block content %}
-<pre>
 <table>
     <tr>
         <th>Line</th>
         <th>Branch</th>
         <th>Exec</th>
-        <th>Source</th>
+        <th align="left">Source</th>
     </tr>
     {% for line in source_lines %}
     <tr>
-        <td>{{line.line_number}}</td>
-        <td>taken/not</td>
-        <td>exec</td>
-        <td>{{line.source}}</td>
+        <td class="lineno"><a id="l{{line.line_number}}" href="#l{{line.line_number}}">{{line.line_number}}</a></td>
+        <td class="linebranch">
+        {% if line.linebranchtotal > 0 %}
+            <details class="linebranchDetails">
+                <summary class="linebranchSummary">{{line.linebranchtaken}}/{{line.linebranchtotal}}</summary>
+                <div class="linebranchContents">
+                    {% for branch in line.branches %}
+                    {% if branch.excluded %}
+                    <div class="excludedBranch">&ndash; Branch excluded.</div>
+                    {% elif branch.count > 0 %}
+                    <div class="takenBranch">&check; Branch taken {{branch.count}} times.</div>
+                    {% else %}
+                    <div class="notTakenBranch">&cross; Branch not taken.</div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </details>
+        {% endif %}
+        </td>
+        <td>placeholder</td>
+        <td class="src" style="white-space: pre;">{{line.source}}</td>
     </tr>
     {% endfor %}
 </table>
-</pre>
 {% endblock content %}

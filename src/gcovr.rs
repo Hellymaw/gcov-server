@@ -13,7 +13,7 @@ pub struct LineEntry {
     pub line_number: usize,
     // function_name: String,
     pub count: usize,
-    // branches: Vec<BranchEntry>,
+    pub branches: Vec<BranchEntry>,
     // conditions: Vec<ConditionEntry>,
     // block_ids: Vec<i64>,
     // #[serde(rename = "gcovr/md5")]
@@ -23,9 +23,19 @@ pub struct LineEntry {
 pub fn fake_file_entry() -> FileEntry {
     let mut lines: Vec<LineEntry> = Vec::new();
     for i in 0..100 {
+        let mut branches: Vec<BranchEntry> = Vec::new();
+        for _ in 0..2 {
+            branches.push(BranchEntry {
+                count: 2,
+                fallthrough: false,
+                throw: false,
+            });
+        }
+
         lines.push(LineEntry {
             line_number: i,
             count: 2,
+            branches,
         });
     }
 
@@ -36,8 +46,8 @@ pub fn fake_file_entry() -> FileEntry {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct BranchEntry {
-    count: usize,
+pub struct BranchEntry {
+    pub count: usize,
     fallthrough: bool,
     throw: bool,
 }
