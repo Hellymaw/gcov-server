@@ -8,6 +8,8 @@ rec {
   env.POSTGRES_PORT = 5432;
   env.RUST_LOG="info";
 
+  dotenv.enable = true;
+
   packages = [ pkgs.git pkgs.docker pkgs.openssl ];
 
   languages.rust.enable = true;

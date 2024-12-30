@@ -1,5 +1,10 @@
+use lazy_static::lazy_static;
 use serde::Serialize;
 use std::path::Path;
+
+lazy_static! {
+    static ref GITEA_API_KEY: String = std::env::var("GITEA_API_KEY").unwrap();
+}
 
 pub async fn get_file(_path: &Path) -> String {
     let file_data = "some\nfile\nwith\ndata";
@@ -39,6 +44,7 @@ pub async fn get_repo_contents(_org: &str, _repo: &str, _commit: &str) -> Vec<Fi
 }
 
 pub mod repository {
+    use crate::gitea::GITEA_API_KEY;
     use base64::{prelude::BASE64_STANDARD, Engine as _};
     use serde::{de, Deserialize};
 
@@ -166,7 +172,7 @@ pub mod repository {
 
         reqwest::Client::new()
             .get(url)
-            .header("Authorization", "some_key")
+            .header("Authorization", GITEA_API_KEY.as_str())
             .send()
             .await?
             .json::<Entry>()
