@@ -101,12 +101,10 @@ pub mod repository {
                     Ok(Self::Directory(entries))
                 }
                 serde_json::Value::Object(_) => {
-                    tracing::info!("json: {json:?}");
-
                     let mut resp: ContentsResponse =
                         serde_json::from_value(json).map_err(de::Error::custom)?;
 
-                    tracing::info!("Resp: {resp:?}");
+                    tracing::debug!("Resp: {resp:?}");
 
                     match resp.r#type.as_str() {
                         "file" => {
