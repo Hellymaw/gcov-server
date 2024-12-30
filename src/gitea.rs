@@ -159,14 +159,19 @@ pub mod repository {
     pub async fn get_repository_entries(
         owner: &str,
         repository: &str,
+        reference: Option<&str>,
         filepath: &str,
     ) -> Result<Entry, reqwest::Error> {
         // TODO: validate filepath
 
         // The API scheme requires the root dir to fetch without a trailing '/'. So remove it if given
         let filepath = if filepath == "/" { "" } else { filepath };
-        let url =
+        let mut url =
             format!("http://localhost:3000/api/v1/repos/{owner}/{repository}/contents{filepath}");
+        if let Some(reference) = reference {
+            url.push_str("?ref=");
+            url.push_str(reference);
+        }
 
         tracing::info!("Requesting \'{filepath}\' from {owner}/{repository}");
 
