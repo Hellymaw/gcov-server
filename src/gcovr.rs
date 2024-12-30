@@ -21,26 +21,17 @@ pub struct LineEntry {
 }
 
 pub fn fake_file_entry() -> FileEntry {
+    let mut lines: Vec<LineEntry> = Vec::new();
+    for i in 0..100 {
+        lines.push(LineEntry {
+            line_number: i,
+            count: 2,
+        });
+    }
+
     FileEntry {
         filename: "some_file".into(),
-        lines: vec![
-            LineEntry {
-                line_number: 2,
-                count: 1,
-            },
-            LineEntry {
-                line_number: 1,
-                count: 0,
-            },
-            LineEntry {
-                line_number: 4,
-                count: 1,
-            },
-            LineEntry {
-                line_number: 3,
-                count: 1,
-            },
-        ],
+        lines,
     }
 }
 

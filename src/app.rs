@@ -76,11 +76,13 @@ pub async fn tree_handler(
         .split_once('/')
         .ok_or_else(|| anyhow::anyhow!("A filepath and commit SHA is required!"))?;
 
-    let path = "/".to_string() + path;
+    let mut path = path.to_string();
+    if !path.is_empty() {
+        path = "/".to_string() + &path;
+    }
 
     let repo_contents =
-        gitea::repository::get_repository_entries(&owner, &repo, Some(commit), path.as_str())
-            .await?;
+        gitea::repository::get_repository_entries(&owner, &repo, Some(commit), &path).await?;
     info!("{:?}", repo_contents);
 
     #[derive(Serialize)]
@@ -113,32 +115,39 @@ pub async fn tree_handler(
 
 pub async fn blob_handler(
     _db: Extension<PgPool>,
-    Path((_owner, _repo, path)): Path<(String, String, String)>,
+    Path((owner, repo, path)): Path<(String, String, String)>,
 ) -> Result<Html<String>, AppError> {
-    let (_commit, path) = path
+    let (commit, path) = path
         .split_once('/')
-        .ok_or(anyhow::anyhow!("Need a filepath!"))?;
+        .ok_or_else(|| anyhow::anyhow!("Need a filepath!"))?;
 
-    let file_data = gitea::get_file(&std::path::Path::new(path)).await;
+    let path = "/".to_string() + path;
 
-    let mut entry = gcovr::fake_file_entry();
-    entry
-        .lines
-        .sort_by(|a, b| a.line_number.cmp(&b.line_number));
+    let file_data =
+        gitea::repository::get_repository_entries(&owner, &repo, Some(commit), &path).await?;
 
-    let source_lines: Vec<FileTemplate> = file_data
-        .lines()
-        .zip(entry.lines)
-        .map(|(source, entry)| FileTemplate {
-            source,
-            line_number: entry.line_number,
-        })
-        .collect();
+    if let gitea::repository::Entry::File { content } = file_data {
+        let mut entry = gcovr::fake_file_entry();
+        entry
+            .lines
+            .sort_by(|a, b| a.line_number.cmp(&b.line_number));
 
-    let mut context = tera::Context::new();
-    context.insert("source_lines", &source_lines);
+        let source_lines: Vec<FileTemplate> = content
+            .lines()
+            .zip(entry.lines)
+            .map(|(source, entry)| FileTemplate {
+                source,
+                line_number: entry.line_number,
+            })
+            .collect();
 
-    Ok(Html::from(TEMPLATES.render("blob.html", &context)?))
+        let mut context = tera::Context::new();
+        context.insert("source_lines", &source_lines);
+
+        Ok(Html::from(TEMPLATES.render("blob.html", &context)?))
+    } else {
+        Err(anyhow::anyhow!("Not a valid path!").into())
+    }
 }
 
 pub mod tmp {
