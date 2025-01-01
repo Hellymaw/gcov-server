@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query},
+    extract::{Json, Path, Query},
     response::Html,
     Extension,
 };
@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use tera::{Context, Tera};
 use tracing::info;
 
-use crate::gcovr;
-use crate::gitea;
+use crate::{db, gcovr};
+use crate::{db::reports::ReportTableEntry, gitea};
 
 pub struct AppError(anyhow::Error);
 
@@ -177,6 +177,25 @@ pub async fn blob_handler(
     } else {
         Err(anyhow::anyhow!("Not a valid path!").into())
     }
+}
+
+pub async fn ingest_report(
+    db: Extension<PgPool>,
+    Path((owner, repo, commit, filepath)): Path<(String, String, String, String)>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<(), AppError> {
+    db::reports::insert_into_table(&*db, &owner, &repo, "main", &commit, &filepath, payload)
+        .await?;
+    Ok(())
+}
+
+pub async fn test_ingest_report(
+    db: Extension<PgPool>,
+    Path((_owner, _repo, _commit, _filepath)): Path<(String, String, String, String)>,
+) -> Result<Json<Vec<ReportTableEntry>>, AppError> {
+    let table = db::reports::fetch_table(&*db).await?;
+
+    Ok(Json(table))
 }
 
 pub mod tmp {

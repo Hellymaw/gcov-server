@@ -173,6 +173,10 @@ pub mod reports {
         pub branch: String,
         /// Git commit the report belongs to
         pub commit: String,
+        /// File in the repository the report belongs to
+        pub filepath: sqlx::postgres::types::PgLTree,
+        /// Report
+        pub report: serde_json::Value,
     }
 
     impl Serialize for ReportTableEntry {
@@ -187,6 +191,8 @@ pub mod reports {
             state.serialize_field("repo", &self.repo)?;
             state.serialize_field("branch", &self.branch)?;
             state.serialize_field("commit", &self.commit)?;
+            state.serialize_field("filepath", &self.filepath.to_string())?;
+            state.serialize_field("report", &self.report)?;
 
             state.end()
         }
@@ -196,13 +202,15 @@ pub mod reports {
     pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS reports (
-                        report_id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                        insert_time timestamptz,
-                        org varchar,
-                        repo varchar,
-                        branch varchar,
-                        commit varchar
-                    );"#,
+                report_id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                insert_time timestamptz,
+                org varchar,
+                repo varchar,
+                branch varchar,
+                commit varchar,
+                filepath ltree,
+                report jsonb
+            );"#,
         )
         .execute(db)
         .await
@@ -211,7 +219,7 @@ pub mod reports {
     /// Fetches the report table
     pub async fn fetch_table(db: &PgPool) -> Result<Vec<ReportTableEntry>, DbError> {
         let resp: Vec<ReportTableEntry> = sqlx::query_as(
-            "SELECT insert_time, org, repo, branch, commit FROM reports ORDER BY org, repo, insert_time",
+            "SELECT insert_time, org, repo, branch, commit, filepath, report FROM reports ORDER BY org, repo, insert_time",
         )
         .fetch_all(&*db)
         .await?;
@@ -226,14 +234,22 @@ pub mod reports {
         repository: &str,
         branch: &str,
         commit: &str,
+        filepath: &str,
+        report: serde_json::Value,
     ) -> Result<(), DbError> {
-        let _resp = sqlx::query("INSERT INTO reports(insert_time, org, repo, branch, commit) VALUES (now(), $1, $2, $3, $4)")
-            .bind(organisation)
-            .bind(repository)
-            .bind(branch)
-            .bind(commit)
-            .execute(db)
-            .await?;
+        sqlx::query(
+            r#"INSERT INTO
+                reports(insert_time,org, repo, branch, commit, filepath, report)
+            VALUES (now(), $1, $2, $3, $4, CAST($5 AS ltree), $6)"#,
+        )
+        .bind(organisation)
+        .bind(repository)
+        .bind(branch)
+        .bind(commit)
+        .bind(filepath)
+        .bind(report)
+        .execute(db)
+        .await?;
 
         Ok(())
     }

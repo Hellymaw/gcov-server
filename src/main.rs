@@ -1,4 +1,7 @@
-use axum::{routing::get, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use tower_http::trace::TraceLayer;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -59,6 +62,10 @@ async fn main() {
             get(app::tmp::repo_summaries_handler),
         )
         .route("/summaries", get(app::tmp::root_summary_handler))
+        .route(
+            "/report/:owner/:repo/:commit/*path",
+            get(app::test_ingest_report).post(app::ingest_report),
+        )
         .layer(Extension(db_pool))
         .layer(TraceLayer::new_for_http());
 

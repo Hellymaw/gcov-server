@@ -20,6 +20,7 @@ rec {
 
   services.postgres = {
     enable = true;
+    package = pkgs.postgresql_17;
     listen_addresses = "${env.POSTGRES_HOST}";
     port = env.POSTGRES_PORT;
     initialDatabases = [
@@ -29,5 +30,6 @@ rec {
         pass = "${env.POSTGRES_PASSWORD}";
       }
     ];
+    initialScript = "CREATE EXTENSION ltree;";
   };
 }
