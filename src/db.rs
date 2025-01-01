@@ -156,7 +156,7 @@ pub mod summary {
 }
 
 pub mod reports {
-    use crate::db::DbError;
+    use crate::{db::DbError, gcovr};
     use serde::{ser::SerializeStruct, Serialize};
     use sqlx::{postgres::PgQueryResult, PgPool};
 
@@ -176,7 +176,8 @@ pub mod reports {
         /// File in the repository the report belongs to
         pub filepath: sqlx::postgres::types::PgLTree,
         /// Report
-        pub report: serde_json::Value,
+        #[sqlx(json)]
+        pub report: gcovr::FileEntry,
     }
 
     impl Serialize for ReportTableEntry {
@@ -222,6 +223,28 @@ pub mod reports {
             "SELECT insert_time, org, repo, branch, commit, filepath, report FROM reports ORDER BY org, repo, insert_time",
         )
         .fetch_all(&*db)
+        .await?;
+
+        Ok(resp)
+    }
+
+    pub async fn fetch_specific_record(
+        db: &PgPool,
+        owner: &str,
+        repo: &str,
+        commit: &str,
+        filepath: &str,
+    ) -> Result<ReportTableEntry, DbError> {
+        let filepath = filepath.replace('/', "").replace(".", "_");
+
+        let resp: ReportTableEntry = sqlx::query_as(
+            "SELECT insert_time, org, repo, branch, commit, filepath, report FROM reports WHERE org = $1 AND repo = $2 AND commit = $3 AND filepath = CAST($4 AS ltree)",
+        )
+        .bind(owner)
+        .bind(repo)
+        .bind(commit)
+        .bind(filepath)
+        .fetch_one(&*db)
         .await?;
 
         Ok(resp)

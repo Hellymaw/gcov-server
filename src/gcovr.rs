@@ -20,31 +20,6 @@ pub struct LineEntry {
     // md5: String,
 }
 
-pub fn fake_file_entry() -> FileEntry {
-    let mut lines: Vec<LineEntry> = Vec::new();
-    for i in 0..100 {
-        let mut branches: Vec<BranchEntry> = Vec::new();
-        for _ in 0..2 {
-            branches.push(BranchEntry {
-                count: 2,
-                fallthrough: false,
-                throw: false,
-            });
-        }
-
-        lines.push(LineEntry {
-            line_number: i,
-            count: 2,
-            branches,
-        });
-    }
-
-    FileEntry {
-        filename: "some_file".into(),
-        lines,
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BranchEntry {
     pub count: usize,

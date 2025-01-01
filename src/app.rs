@@ -123,7 +123,7 @@ pub async fn tree_handler(
 }
 
 pub async fn blob_handler(
-    _db: Extension<PgPool>,
+    db: Extension<PgPool>,
     Path((owner, repo, path)): Path<(String, String, String)>,
 ) -> Result<Html<String>, AppError> {
     let (commit, path) = path
@@ -136,7 +136,10 @@ pub async fn blob_handler(
         gitea::repository::get_repository_entries(&owner, &repo, Some(commit), &path).await?;
 
     if let gitea::repository::Entry::File { content } = file_data {
-        let mut entry = gcovr::fake_file_entry();
+        // NOTE: path is not normalised correctly
+        let file_report =
+            db::reports::fetch_specific_record(&*db, &owner, &repo, commit, &path).await?;
+        let mut entry = file_report.report;
         entry
             .lines
             .sort_by(|a, b| a.line_number.cmp(&b.line_number));
