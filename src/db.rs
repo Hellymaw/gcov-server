@@ -50,64 +50,72 @@ pub async fn connect_and_setup() -> Result<Pool<Postgres>, sqlx::Error> {
 
 pub mod summary {
     use crate::db::DbError;
-    use serde::{ser::SerializeStruct, Deserialize, Serialize};
-    use sqlx::{postgres::PgQueryResult, PgPool};
-
-    // GCOV generates the JSON with flat fields in the form "branch_covered", "function_covered", etc
-    // This means we can extract the commonality within `Coverage`
-    serde_with::with_prefix!(prefix_branch "branch_");
-    serde_with::with_prefix!(prefix_function "function_");
-    serde_with::with_prefix!(prefix_line "line_");
+    use serde::{Deserialize, Serialize};
+    use sqlx::{
+        postgres::{PgQueryResult, PgRow},
+        PgPool, Row,
+    };
 
     /// Represents a test coverage
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
     pub struct Coverage {
         /// Number of cases covered
-        pub covered: usize,
+        pub covered: i32,
         /// Total number of cases
-        pub total: usize,
-        /// Percentage of cases covered, i.e. `covered / total`
-        pub percent: f64,
+        pub total: i32,
     }
 
     /// Represents a GCOV JSON coverage summary report
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct CoverageSummary {
-        #[serde(flatten, with = "prefix_branch")]
         pub branch: Coverage,
-        #[serde(flatten, with = "prefix_function")]
         pub function: Coverage,
-        #[serde(flatten, with = "prefix_line")]
         pub line: Coverage,
     }
 
-    /// Represents a row in the 'summary' db table
-    #[derive(sqlx::FromRow, Debug)]
-    pub struct SummaryTableEntry {
-        /// Row insertion time
-        pub insert_time: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
-        /// Gitea organisation the repo belongs to
-        pub org: String,
-        /// Gitea repository the summary belongs to
-        pub repo: String,
-        /// Test coverage summary
-        pub coverage: sqlx::types::JsonValue,
+    impl sqlx::FromRow<'_, PgRow> for CoverageSummary {
+        fn from_row(row: &'_ PgRow) -> Result<Self, sqlx::Error> {
+            Ok(Self {
+                branch: Coverage {
+                    covered: row.try_get("branch.covered")?,
+                    total: row.try_get("branch.total")?,
+                },
+                function: Coverage {
+                    covered: row.try_get("function.covered")?,
+                    total: row.try_get("function.total")?,
+                },
+                line: Coverage {
+                    covered: row.try_get("line.covered")?,
+                    total: row.try_get("line.total")?,
+                },
+            })
+        }
     }
 
-    impl Serialize for SummaryTableEntry {
+    #[derive(Debug, sqlx::Type)]
+    pub struct UtcDateTime(sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>);
+
+    impl Serialize for UtcDateTime {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            let mut state = serializer.serialize_struct("SummaryTableEntry", 4)?;
-
-            state.serialize_field("insert_time", &self.insert_time.timestamp())?;
-            state.serialize_field("org", &self.org)?;
-            state.serialize_field("repo", &self.repo)?;
-            state.serialize_field("coverage", &self.coverage)?;
-
-            state.end()
+            serializer.serialize_i64(self.0.timestamp())
         }
+    }
+
+    /// Represents a row in the 'summary' db table
+    #[derive(sqlx::FromRow, Debug, Serialize)]
+    pub struct SummaryTableEntry {
+        /// Row insertion time
+        pub insert_time: UtcDateTime,
+        /// Gitea organisation the repo belongs to
+        pub owner: String,
+        /// Gitea repository the summary belongs to
+        pub repository: String,
+        /// Test coverage summary
+        #[sqlx(flatten)]
+        pub coverage: CoverageSummary,
     }
 
     /// Creates the summary db table if it doesn't exist
