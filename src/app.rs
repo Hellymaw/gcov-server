@@ -201,51 +201,46 @@ pub async fn test_ingest_report(
     Ok(Json(table))
 }
 
-pub mod tmp {
-    use axum::extract::{Path, Query};
-    use axum::response::Html;
-    use axum::Extension;
-    use sqlx::PgPool;
-    use std::collections::HashMap;
+pub async fn root_summary_handler(
+    db: Extension<PgPool>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Html<String>, AppError> {
+    let root = params.get("root").is_some_and(|x| x.len() > 0);
 
-    use crate::db;
-    use crate::TEMPLATES;
+    let mut summaries = db::summary::fetch_latest_summaries(&*db).await?;
 
-    pub async fn root_summary_handler(
-        db: Extension<PgPool>,
-        Query(params): Query<HashMap<String, String>>,
-    ) -> Html<String> {
-        let root = params.get("root").is_some_and(|x| x.len() > 0);
-
-        let summaries =
-            db::tmp::fetch_latest_summaries(&*db, params.get("owner"), params.get("repo")).await;
-
-        let mut context = tera::Context::new();
-        context.insert("summaries", &summaries);
-        context.insert("root", &root);
-
-        let output = TEMPLATES
-            .render("summary/root_owner.html", &context)
-            .unwrap();
-
-        Html::from(output)
+    if let Some(owner) = params.get("owner") {
+        summaries.retain(|s| s.owner.contains(owner));
     }
 
-    pub async fn repo_summaries_handler(
-        _db: Extension<PgPool>,
-        Path((owner, repo)): Path<(String, String)>,
-        Query(params): Query<HashMap<String, String>>,
-    ) -> Html<String> {
-        let reports =
-            db::tmp::fetch_repo_coverage_reports(&owner, &repo, params.get("branch")).await;
-
-        let mut context = tera::Context::new();
-        context.insert("reports", &reports);
-        context.insert("repo", &repo);
-        context.insert("owner", &owner);
-
-        let output = TEMPLATES.render("summary/repo.html", &context).unwrap();
-
-        Html::from(output)
+    if let Some(repo) = params.get("repo") {
+        summaries.retain(|s| s.owner.contains(repo));
     }
+
+    let mut context = tera::Context::new();
+    context.insert("summaries", &summaries);
+    context.insert("root", &root);
+
+    let output = TEMPLATES
+        .render("summary/root_owner.html", &context)
+        .unwrap();
+
+    Ok(Html::from(output))
+}
+
+pub async fn repo_summaries_handler(
+    db: Extension<PgPool>,
+    Path((owner, repo)): Path<(String, String)>,
+    Query(_params): Query<HashMap<String, String>>,
+) -> Result<Html<String>, AppError> {
+    let reports = db::summary::fetch_repo_summaries(&db, &owner, &repo).await?;
+
+    let mut context = tera::Context::new();
+    context.insert("reports", &reports);
+    context.insert("repo", &repo);
+    context.insert("owner", &owner);
+
+    let output = TEMPLATES.render("summary/repo.html", &context).unwrap();
+
+    Ok(Html::from(output))
 }

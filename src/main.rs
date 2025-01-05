@@ -1,7 +1,4 @@
-use axum::{
-    routing::{get, post},
-    Extension, Router,
-};
+use axum::{routing::get, Extension, Router};
 use tower_http::trace::TraceLayer;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -10,8 +7,6 @@ mod app;
 mod db;
 mod gcovr;
 mod gitea;
-
-use app::TEMPLATES;
 
 const MAX_LOG_FILES: usize = 48;
 
@@ -57,11 +52,8 @@ async fn main() {
         .route("/:owner/:repo", get(app::repo_handler))
         .route("/:owner/:repo/tree/*path", get(app::tree_handler))
         .route("/:owner/:repo/blob/*path", get(app::blob_handler))
-        .route(
-            "/:org/:repo/summaries",
-            get(app::tmp::repo_summaries_handler),
-        )
-        .route("/summaries", get(app::tmp::root_summary_handler))
+        .route("/:org/:repo/summaries", get(app::repo_summaries_handler))
+        .route("/summaries", get(app::root_summary_handler))
         .route(
             "/report/:owner/:repo/:commit/*path",
             get(app::test_ingest_report).post(app::ingest_report),

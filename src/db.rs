@@ -1,4 +1,6 @@
 use lazy_static::lazy_static;
+use sqlx::postgres::PgQueryResult;
+use sqlx::FromRow;
 use sqlx::PgPool;
 use sqlx::Pool;
 use sqlx::Postgres;
@@ -48,6 +50,60 @@ pub async fn connect_and_setup() -> Result<Pool<Postgres>, sqlx::Error> {
     Ok(db_pool)
 }
 
+pub mod repository {
+    use sqlx::postgres::PgQueryResult;
+    use sqlx::FromRow;
+    use sqlx::PgPool;
+
+    #[derive(Debug, FromRow, sqlx::Type)]
+    #[sqlx(transparent)]
+    pub struct RepositoryId(i32);
+
+    #[derive(Debug, FromRow)]
+    pub struct RepositoryTableEntry {
+        id: RepositoryId,
+        owner: String,
+        name: String,
+    }
+
+    pub(crate) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
+        sqlx::query(
+            r#"CREATE TABLE IF NOT EXISTS repository (
+                    id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    owner varchar NOT NULL,
+                    name varchar NOT NULL,
+                    UNIQUE (owner, name)
+                );"#,
+        )
+        .execute(db)
+        .await
+    }
+
+    pub async fn insert(
+        db: &PgPool,
+        owner: &str,
+        repository: &str,
+    ) -> Result<PgQueryResult, sqlx::Error> {
+        sqlx::query("INSERT INTO repository VALUES ($1, $2);")
+            .bind(owner)
+            .bind(repository)
+            .execute(db)
+            .await
+    }
+
+    pub async fn fetch_id(
+        db: &PgPool,
+        owner: &str,
+        name: &str,
+    ) -> Result<Option<RepositoryId>, sqlx::Error> {
+        sqlx::query_as("SELECT id FROM repository WHERE owner = $1 AND name = $2;")
+            .bind(owner)
+            .bind(name)
+            .fetch_optional(db)
+            .await
+    }
+}
+
 pub mod summary {
     use crate::db::DbError;
     use serde::{Deserialize, Serialize};
@@ -55,6 +111,8 @@ pub mod summary {
         postgres::{PgQueryResult, PgRow},
         PgPool, Row,
     };
+
+    use super::repository;
 
     /// Represents a test coverage
     #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -77,16 +135,16 @@ pub mod summary {
         fn from_row(row: &'_ PgRow) -> Result<Self, sqlx::Error> {
             Ok(Self {
                 branch: Coverage {
-                    covered: row.try_get("branch.covered")?,
-                    total: row.try_get("branch.total")?,
+                    covered: row.try_get("branch_covered")?,
+                    total: row.try_get("branch_total")?,
                 },
                 function: Coverage {
-                    covered: row.try_get("function.covered")?,
-                    total: row.try_get("function.total")?,
+                    covered: row.try_get("function_covered")?,
+                    total: row.try_get("function_total")?,
                 },
                 line: Coverage {
-                    covered: row.try_get("line.covered")?,
-                    total: row.try_get("line.total")?,
+                    covered: row.try_get("line_covered")?,
+                    total: row.try_get("line_total")?,
                 },
             })
         }
@@ -107,12 +165,11 @@ pub mod summary {
     /// Represents a row in the 'summary' db table
     #[derive(sqlx::FromRow, Debug, Serialize)]
     pub struct SummaryTableEntry {
+        pub id: i32,
+        /// Gitea repository the summary belongs to
+        pub repository: i32,
         /// Row insertion time
         pub insert_time: UtcDateTime,
-        /// Gitea organisation the repo belongs to
-        pub owner: String,
-        /// Gitea repository the summary belongs to
-        pub repository: String,
         /// Test coverage summary
         #[sqlx(flatten)]
         pub coverage: CoverageSummary,
@@ -122,10 +179,15 @@ pub mod summary {
     pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS summary (
+                        id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                         insert_time timestamptz,
-                        org varchar,
-                        repo varchar,
-                        coverage jsonb
+                        repository_id int REFERENCES repository (id),
+                        branch_covered int,
+                        branch_total int,
+                        function_covered int,
+                        function_total int,
+                        line_covered int,
+                        line_total int,
                     );"#,
         )
         .execute(db)
@@ -138,28 +200,64 @@ pub mod summary {
         org: &str,
         repo: &str,
         coverage: &CoverageSummary,
-    ) -> Result<(), DbError> {
-        let json_coverage = serde_json::to_value(coverage)?;
+    ) -> Result<PgQueryResult, sqlx::Error> {
+        let repo_id = if let Some(id) = repository::fetch_id(db, org, repo).await? {
+            id
+        } else {
+            repository::insert(db, org, repo).await?;
+            repository::fetch_id(db, org, repo)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)?
+        };
 
-        let _resp = sqlx::query("INSERT INTO summary VALUES (now(), $1, $2, $3)")
-            .bind(org)
-            .bind(repo)
-            .bind(json_coverage)
+        sqlx::query("INSERT INTO summary VALUES (now(), $1, $2, $3, $4, $5, $6, $7)")
+            .bind(repo_id)
+            .bind(coverage.branch.covered)
+            .bind(coverage.branch.total)
+            .bind(coverage.function.covered)
+            .bind(coverage.function.total)
+            .bind(coverage.line.covered)
+            .bind(coverage.line.total)
             .execute(db)
-            .await?;
+            .await
+    }
 
-        Ok(())
+    /// Represents a row in the 'summary' db table
+    #[derive(sqlx::FromRow, Debug, Serialize)]
+    pub struct RepoSummary {
+        pub owner: String,
+        pub name: String,
+        pub insert_time: UtcDateTime,
+        #[sqlx(flatten)]
+        pub coverage: CoverageSummary,
     }
 
     /// Fetches the summary table
-    pub async fn fetch_table(db: &PgPool) -> Result<Vec<SummaryTableEntry>, DbError> {
-        let resp: Vec<SummaryTableEntry> = sqlx::query_as(
-            "SELECT DISTINCT org, repo, coverage, MAX(inserttime) AS inserttime FROM summary GROUP BY org, repo, coverage",
+    pub async fn fetch_latest_summaries(db: &PgPool) -> Result<Vec<RepoSummary>, sqlx::Error> {
+        sqlx::query_as(
+            r#"SELECT * FROM summary a
+            INNER JOIN repository ON repository.id=summary.repository_id
+            WHERE summary.insert_time = (SELECT MAX(insert_time) FROM summary b WHERE a.repo_id = b.repo_id);"#,
         )
         .fetch_all(&*db)
-        .await?;
+        .await
+    }
 
-        Ok(resp)
+    pub async fn fetch_repo_summaries(
+        db: &PgPool,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<RepoSummary>, sqlx::Error> {
+        sqlx::query_as(
+            r#"SELECT * FROM summary
+            INNER JOIN repository ON repository.id=summary.repository_id
+            WHERE repository.owner = $1 and repository.name = $2
+            ORDER BY summary.insert_time DESC;"#,
+        )
+        .bind(owner)
+        .bind(repo)
+        .fetch_all(&*db)
+        .await
     }
 }
 

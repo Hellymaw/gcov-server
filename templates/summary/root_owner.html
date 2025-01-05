@@ -1,9 +1,9 @@
 {% for summary in summaries %}
 <tr>
-    {% if root %}<td>{{summary.org}}</td>{% endif %}
-    <td><a href="/{{summary.org}}/{{summary.repo}}">{{summary.repo}}</a></td>
-    <td>{{summary.coverage.branch}}</td>
-    <td>{{summary.coverage.function}}</td>
-    <td>{{summary.coverage.line}}</td>
+    {% if root %}<td>{{summary.owner}}</td>{% endif %}
+    <td><a href="/{{summary.owner}}/{{summary.name}}">{{summary.name}}</a></td>
+    {# TODO <td>{{ {{summary.coverage.branch.covered}} / {{summary.coverage.branch.total}} }}</td>
+    <td>{{ {{summary.coverage.function.covered}} / {{summary.coverage.function.total}} }}</td>
+    <td>{{ {{summary.coverage.line.covered}} / {{summary.coverage.line.total}} }}</td> #}
 </tr>
 {% endfor %}
