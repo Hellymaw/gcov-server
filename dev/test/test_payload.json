@@ -1,0 +1,51 @@
+[
+    {
+        "filename": "init.sql",
+        "lines": [
+            {
+                "line_number": 1,
+                "count": 2,
+                "branches": [
+                    {
+                        "count": 2,
+                        "fallthrough": false,
+                        "throw": false
+                    }
+                ]
+            },
+            {
+                "line_number": 2,
+                "count": 2,
+                "branches": [
+                    {
+                        "count": 2,
+                        "fallthrough": false,
+                        "throw": false
+                    }
+                ]
+            },
+            {
+                "line_number": 3,
+                "count": 2,
+                "branches": [
+                    {
+                        "count": 2,
+                        "fallthrough": false,
+                        "throw": false
+                    }
+                ]
+            },
+            {
+                "line_number": 4,
+                "count": 2,
+                "branches": [
+                    {
+                        "count": 2,
+                        "fallthrough": false,
+                        "throw": false
+                    }
+                ]
+            }
+        ]
+    }
+]

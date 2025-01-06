@@ -55,7 +55,7 @@ async fn main() {
         .route("/:org/:repo/summaries", get(app::repo_summaries_handler))
         .route("/summaries", get(app::root_summary_handler))
         .route(
-            "/report/:owner/:repo/:commit/*path",
+            "/report/:owner/:repo/:commit",
             get(app::test_ingest_report).post(app::ingest_report),
         )
         .layer(Extension(db_pool))

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FileEntry {
-    pub filename: PathBuf,
+    pub filename: String,
     pub lines: Vec<LineEntry>,
     // functions: Vec<FunctionEntry>,
 }

@@ -81,9 +81,7 @@ pub async fn tree_handler(
     _db: Extension<PgPool>,
     Path((owner, repo, path)): Path<(String, String, String)>,
 ) -> Result<Html<String>, AppError> {
-    let (commit, path) = path
-        .split_once('/')
-        .ok_or_else(|| anyhow::anyhow!("A filepath and commit SHA is required!"))?;
+    let (commit, path) = path.split_once('/').unwrap_or((&path, ""));
 
     let mut path = path.to_string();
     if !path.is_empty() {
@@ -184,11 +182,41 @@ pub async fn blob_handler(
 
 pub async fn ingest_report(
     db: Extension<PgPool>,
-    Path((owner, repo, commit, filepath)): Path<(String, String, String, String)>,
-    Json(payload): Json<serde_json::Value>,
+    Path((owner, repo, commit)): Path<(String, String, String)>,
+    Json(payload): Json<Vec<gcovr::FileEntry>>,
 ) -> Result<(), AppError> {
-    db::reports::insert_into_table(&*db, &owner, &repo, "main", &commit, &filepath, payload)
-        .await?;
+    tracing::info!("{payload:?}");
+
+    // TODO: Shift into ::repository::
+    let repo_id = if let Some(id) = db::repository::fetch_id(&db, &owner, &repo).await? {
+        id
+    } else {
+        db::repository::insert(&db, &owner, &repo).await?;
+        db::repository::fetch_id(&db, &owner, &repo)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?
+    };
+
+    let mut summary = db::summary::CoverageSummary::default();
+    for entry in payload {
+        for lines in &entry.lines {
+            summary.line.total += lines.count as i32;
+            summary.line.covered += lines.count as i32;
+
+            for branch in &lines.branches {
+                summary.branch.covered += branch.count as i32;
+                summary.branch.total += branch.count as i32;
+            }
+        }
+
+        // todo normalise filename
+        let filepath = entry.filename.replace("/", ".");
+
+        db::reports::insert_into_table(&*db, &repo_id, "main", &commit, &filepath, &entry).await?;
+    }
+
+    let _ = db::summary::insert_into_table(&db, &owner, &repo, "main", &commit, &summary).await;
+
     Ok(())
 }
 
@@ -208,6 +236,8 @@ pub async fn root_summary_handler(
     let root = params.get("root").is_some_and(|x| x.len() > 0);
 
     let mut summaries = db::summary::fetch_latest_summaries(&*db).await?;
+
+    tracing::info!("{summaries:?}");
 
     if let Some(owner) = params.get("owner") {
         summaries.retain(|s| s.owner.contains(owner));

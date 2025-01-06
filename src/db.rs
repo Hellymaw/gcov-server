@@ -44,6 +44,7 @@ fn fetch_env_var_exiting(key: &str) -> String {
 pub async fn connect_and_setup() -> Result<Pool<Postgres>, sqlx::Error> {
     let db_pool = PgPool::connect(&CONNECTION_URL).await?;
 
+    let _ = repository::setup_table(&db_pool).await?;
     let _ = summary::setup_table(&db_pool).await?;
     let _ = reports::setup_table(&db_pool).await?;
 
@@ -84,7 +85,7 @@ pub mod repository {
         owner: &str,
         repository: &str,
     ) -> Result<PgQueryResult, sqlx::Error> {
-        sqlx::query("INSERT INTO repository VALUES ($1, $2);")
+        sqlx::query("INSERT INTO repository(owner, name) VALUES ($1, $2);")
             .bind(owner)
             .bind(repository)
             .execute(db)
@@ -115,7 +116,7 @@ pub mod summary {
     use super::repository;
 
     /// Represents a test coverage
-    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+    #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Default)]
     pub struct Coverage {
         /// Number of cases covered
         pub covered: i32,
@@ -124,7 +125,7 @@ pub mod summary {
     }
 
     /// Represents a GCOV JSON coverage summary report
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Default)]
     pub struct CoverageSummary {
         pub branch: Coverage,
         pub function: Coverage,
@@ -151,6 +152,7 @@ pub mod summary {
     }
 
     #[derive(Debug, sqlx::Type)]
+    #[sqlx(transparent)]
     pub struct UtcDateTime(sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>);
 
     impl Serialize for UtcDateTime {
@@ -168,6 +170,8 @@ pub mod summary {
         pub id: i32,
         /// Gitea repository the summary belongs to
         pub repository: i32,
+        pub brnach: String,
+        pub commit: String,
         /// Row insertion time
         pub insert_time: UtcDateTime,
         /// Test coverage summary
@@ -182,12 +186,14 @@ pub mod summary {
                         id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                         insert_time timestamptz,
                         repository_id int REFERENCES repository (id),
+                        branch varchar,
+                        commit varchar,
                         branch_covered int,
                         branch_total int,
                         function_covered int,
                         function_total int,
                         line_covered int,
-                        line_total int,
+                        line_total int
                     );"#,
         )
         .execute(db)
@@ -199,6 +205,8 @@ pub mod summary {
         db: &PgPool,
         org: &str,
         repo: &str,
+        branch: &str,
+        commit: &str,
         coverage: &CoverageSummary,
     ) -> Result<PgQueryResult, sqlx::Error> {
         let repo_id = if let Some(id) = repository::fetch_id(db, org, repo).await? {
@@ -210,8 +218,10 @@ pub mod summary {
                 .ok_or(sqlx::Error::RowNotFound)?
         };
 
-        sqlx::query("INSERT INTO summary VALUES (now(), $1, $2, $3, $4, $5, $6, $7)")
+        sqlx::query("INSERT INTO summary(insert_time, repository_id, branch, commit, branch_covered, branch_total, function_covered, function_total, line_covered, line_total) VALUES (now(), $1, $2, $3, $4, $5, $6, $7, $8, $9);")
             .bind(repo_id)
+            .bind(branch)
+            .bind(commit)
             .bind(coverage.branch.covered)
             .bind(coverage.branch.total)
             .bind(coverage.function.covered)
@@ -225,22 +235,29 @@ pub mod summary {
     /// Represents a row in the 'summary' db table
     #[derive(sqlx::FromRow, Debug, Serialize)]
     pub struct RepoSummary {
-        pub owner: String,
-        pub name: String,
         pub insert_time: UtcDateTime,
+        pub branch: String,
+        pub commit: String,
         #[sqlx(flatten)]
         pub coverage: CoverageSummary,
+        pub owner: String,
+        pub name: String,
     }
 
     /// Fetches the summary table
     pub async fn fetch_latest_summaries(db: &PgPool) -> Result<Vec<RepoSummary>, sqlx::Error> {
-        sqlx::query_as(
+        let t = sqlx::query_as(
             r#"SELECT * FROM summary a
-            INNER JOIN repository ON repository.id=summary.repository_id
-            WHERE summary.insert_time = (SELECT MAX(insert_time) FROM summary b WHERE a.repo_id = b.repo_id);"#,
+            INNER JOIN repository ON repository.id=a.repository_id
+            WHERE a.insert_time = (SELECT MAX(insert_time) FROM summary b WHERE a.repository_id = b.repository_id);"#,
         )
         .fetch_all(&*db)
-        .await
+        .await;
+
+        if let Err(x) = &t {
+            tracing::error!("{x:?}");
+        }
+        t
     }
 
     pub async fn fetch_repo_summaries(
@@ -266,15 +283,17 @@ pub mod reports {
     use serde::{ser::SerializeStruct, Serialize};
     use sqlx::{postgres::PgQueryResult, PgPool};
 
+    use super::repository;
+
     /// Represents a row in the 'summary' db table
     #[derive(sqlx::FromRow, Debug)]
     pub struct ReportTableEntry {
         /// Row insertion time
         pub insert_time: sqlx::types::chrono::DateTime<sqlx::types::chrono::Utc>,
         /// Gitea organisation the repo belongs to
-        pub org: String,
+        pub owner: String,
         /// Gitea repository the report belongs to
-        pub repo: String,
+        pub name: String,
         /// Git branch the report belongs to
         pub branch: String,
         /// Git commit the report belongs to
@@ -294,8 +313,8 @@ pub mod reports {
             let mut state = serializer.serialize_struct("ReportTableEntry", 4)?;
 
             state.serialize_field("insert_time", &self.insert_time.timestamp())?;
-            state.serialize_field("org", &self.org)?;
-            state.serialize_field("repo", &self.repo)?;
+            state.serialize_field("owner", &self.owner)?;
+            state.serialize_field("name", &self.name)?;
             state.serialize_field("branch", &self.branch)?;
             state.serialize_field("commit", &self.commit)?;
             state.serialize_field("filepath", &self.filepath.to_string())?;
@@ -311,8 +330,7 @@ pub mod reports {
             r#"CREATE TABLE IF NOT EXISTS reports (
                 report_id int GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 insert_time timestamptz,
-                org varchar,
-                repo varchar,
+                repository_id int REFERENCES repository (id),
                 branch varchar,
                 commit varchar,
                 filepath ltree,
@@ -326,7 +344,7 @@ pub mod reports {
     /// Fetches the report table
     pub async fn fetch_table(db: &PgPool) -> Result<Vec<ReportTableEntry>, DbError> {
         let resp: Vec<ReportTableEntry> = sqlx::query_as(
-            "SELECT insert_time, org, repo, branch, commit, filepath, report FROM reports ORDER BY org, repo, insert_time",
+            "SELECT reports.insert_time, repository.owner, repository.name, reports.branch, reports.commit, reports.filepath, reports.report FROM reports INNER JOIN repository ON repository.id=reports.repository_id ORDER BY repository.owner, repository.name, insert_time;",
         )
         .fetch_all(&*db)
         .await?;
@@ -340,160 +358,50 @@ pub mod reports {
         repo: &str,
         commit: &str,
         filepath: &str,
-    ) -> Result<ReportTableEntry, DbError> {
-        let filepath = filepath.replace('/', "").replace(".", "_");
+    ) -> Result<ReportTableEntry, sqlx::Error> {
+        let filepath = filepath.replace('/', "");
 
-        let resp: ReportTableEntry = sqlx::query_as(
-            "SELECT insert_time, org, repo, branch, commit, filepath, report FROM reports WHERE org = $1 AND repo = $2 AND commit = $3 AND filepath = CAST($4 AS ltree)",
+        tracing::info!("{filepath:?}");
+
+        let resp: Result<ReportTableEntry, sqlx::Error> = sqlx::query_as(
+            "SELECT reports.insert_time, repository.owner, repository.name, reports.branch, reports.commit, reports.filepath, reports.report FROM reports INNER JOIN repository ON repository.id=reports.repository_id WHERE repository.owner = $1 AND repository.name = $2 AND commit = $3 AND filepath = CAST($4 AS ltree);",
         )
         .bind(owner)
         .bind(repo)
         .bind(commit)
         .bind(filepath)
         .fetch_one(&*db)
-        .await?;
+        .await;
 
-        Ok(resp)
+        if let Err(x) = &resp {
+            tracing::error!("{x:?}");
+        }
+
+        resp
     }
 
     /// Inserts a test coverage report into the report db table
     pub async fn insert_into_table(
         db: &PgPool,
-        organisation: &str,
-        repository: &str,
+        repository_id: &repository::RepositoryId,
         branch: &str,
         commit: &str,
         filepath: &str,
-        report: serde_json::Value,
+        report: &gcovr::FileEntry,
     ) -> Result<(), DbError> {
         sqlx::query(
             r#"INSERT INTO
-                reports(insert_time,org, repo, branch, commit, filepath, report)
-            VALUES (now(), $1, $2, $3, $4, CAST($5 AS ltree), $6)"#,
+                reports(insert_time, repository_id, branch, commit, filepath, report)
+            VALUES (now(), $1, $2, $3, CAST($4 AS ltree), $5);"#,
         )
-        .bind(organisation)
-        .bind(repository)
+        .bind(repository_id)
         .bind(branch)
         .bind(commit)
         .bind(filepath)
-        .bind(report)
+        .bind(sqlx::types::Json(report))
         .execute(db)
         .await?;
 
         Ok(())
-    }
-}
-
-pub mod tmp {
-    use serde::Serialize;
-    use sqlx::PgPool;
-
-    #[derive(Serialize, Debug)]
-    pub struct CoverageNew {
-        pub branch: f64,
-        pub function: f64,
-        pub line: f64,
-    }
-
-    #[derive(Serialize, Debug)]
-    pub struct Summary {
-        pub org: String,
-        pub repo: String,
-        pub coverage: CoverageNew,
-    }
-
-    pub async fn fetch_latest_summaries(
-        db: &PgPool,
-        org: Option<&String>,
-        repo: Option<&String>,
-    ) -> Vec<Summary> {
-        let mut data = vec![
-            Summary {
-                org: "org1".to_string(),
-                repo: "repo1".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-            Summary {
-                org: "org1".to_string(),
-                repo: "repo2".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-            Summary {
-                org: "org1".to_string(),
-                repo: "repo1".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-        ];
-
-        if let Some(org) = org {
-            data.retain(|x| x.org.contains(org));
-        }
-
-        if let Some(repo) = repo {
-            data.retain(|x| x.repo.contains(repo));
-        }
-
-        data
-    }
-
-    #[derive(Serialize, Debug)]
-    pub struct CoverageReport {
-        pub branch: String,
-        pub commit: String,
-        pub coverage: CoverageNew,
-    }
-
-    pub async fn fetch_repo_coverage_reports(
-        _org: &str,
-        _repo: &str,
-        branch: Option<&String>,
-    ) -> Vec<CoverageReport> {
-        let mut data = vec![
-            CoverageReport {
-                branch: "feature1".to_string(),
-                commit: "qwe".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-            CoverageReport {
-                branch: "feature1".to_string(),
-                commit: "zxc".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-            CoverageReport {
-                branch: "feature2".to_string(),
-                commit: "asd".to_string(),
-                coverage: CoverageNew {
-                    branch: 10.0,
-                    function: 20.1,
-                    line: 30.5,
-                },
-            },
-        ];
-
-        if let Some(branch) = branch {
-            data.retain(|x| x.branch.contains(branch));
-        }
-
-        data
     }
 }
