@@ -137,6 +137,15 @@ pub async fn blob_handler(
         // NOTE: path is not normalised correctly
         let file_report =
             db::reports::fetch_specific_record(&*db, &owner, &repo, commit, &path).await?;
+        if file_report.is_none() {
+            let mut context = tera::Context::new();
+            context.insert("lines", &content);
+
+            return Ok(Html::from(TEMPLATES.render("raw_blob.html", &context)?));
+        }
+
+        let file_report = file_report.ok_or(sqlx::Error::RowNotFound)?;
+
         let mut entry = file_report.report;
         entry
             .lines

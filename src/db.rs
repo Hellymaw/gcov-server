@@ -358,19 +358,19 @@ pub mod reports {
         repo: &str,
         commit: &str,
         filepath: &str,
-    ) -> Result<ReportTableEntry, sqlx::Error> {
+    ) -> Result<Option<ReportTableEntry>, sqlx::Error> {
         let filepath = filepath.replace('/', "");
 
         tracing::info!("{filepath:?}");
 
-        let resp: Result<ReportTableEntry, sqlx::Error> = sqlx::query_as(
+        let resp: Result<Option<ReportTableEntry>, sqlx::Error> = sqlx::query_as(
             "SELECT reports.insert_time, repository.owner, repository.name, reports.branch, reports.commit, reports.filepath, reports.report FROM reports INNER JOIN repository ON repository.id=reports.repository_id WHERE repository.owner = $1 AND repository.name = $2 AND commit = $3 AND filepath = CAST($4 AS ltree);",
         )
         .bind(owner)
         .bind(repo)
         .bind(commit)
         .bind(filepath)
-        .fetch_one(&*db)
+        .fetch_optional(&*db)
         .await;
 
         if let Err(x) = &resp {
