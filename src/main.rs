@@ -1,5 +1,6 @@
 use axum::{routing::get, Extension, Router};
 use tower_http::trace::TraceLayer;
+use tracing::instrument;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -10,6 +11,7 @@ mod gitea;
 
 const MAX_LOG_FILES: usize = 48;
 
+#[instrument(err)]
 fn configure_logging() -> Result<(), tracing_appender::rolling::InitError> {
     let log_dir = std::env::var("LOG_DIR").unwrap_or("./logs".to_string());
     let log_suffix = std::env::var("LOG_SUFFIX").unwrap_or("log".to_string());
@@ -32,16 +34,17 @@ fn configure_logging() -> Result<(), tracing_appender::rolling::InitError> {
 }
 
 #[tokio::main]
+#[instrument]
 async fn main() {
     if let Err(e) = configure_logging() {
-        eprintln!("Error occurred setting up logging: {}", e);
+        tracing::error!("Error occurred setting up logging: {}", e);
         ::std::process::exit(1);
     }
 
     let db_pool = match db::connect_and_setup().await {
         Ok(db) => db,
         Err(e) => {
-            eprintln!("Error occurred setting up database: {}", e);
+            tracing::error!("Error occurred setting up database: {}", e);
             ::std::process::exit(3);
         }
     };
@@ -65,7 +68,7 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Error binding to {}: {}", bind_addr, e);
+            tracing::error!("Error binding to {}: {}", bind_addr, e);
             ::std::process::exit(2);
         }
     };

@@ -21,6 +21,7 @@ pub mod repository {
     use crate::gitea::GITEA_API_KEY;
     use base64::{prelude::BASE64_STANDARD, Engine as _};
     use serde::{de, Deserialize, Serialize};
+    use tracing::instrument;
 
     #[derive(Debug, Deserialize, Serialize)]
     #[serde(rename_all = "lowercase", tag = "type", content = "name")]
@@ -78,8 +79,6 @@ pub mod repository {
                     let mut resp: ContentsResponse =
                         serde_json::from_value(json).map_err(de::Error::custom)?;
 
-                    tracing::debug!("Resp: {resp:?}");
-
                     match resp.r#type.as_str() {
                         "file" => {
                             if let Some(content) = resp.content.take() {
@@ -128,6 +127,7 @@ pub mod repository {
         }
     }
 
+    #[instrument(err)]
     pub async fn get_repository_entries(
         owner: &str,
         repository: &str,

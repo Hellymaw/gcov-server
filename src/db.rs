@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use sqlx::Pool;
 use sqlx::Postgres;
 use thiserror::Error;
+use tracing::instrument;
 
 lazy_static! {
     static ref CONNECTION_URL: String = {
@@ -25,13 +26,15 @@ pub enum DbError {
 }
 
 /// Fetches the environment variable `key` from the process, exiting the process on error.
+#[instrument]
 fn fetch_env_var_exiting(key: &str) -> String {
     match std::env::var(key) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!(
+            tracing::error!(
                 "${} {}. This is required for the program to function.",
-                key, e
+                key,
+                e
             );
             ::std::process::exit(2);
         }
@@ -53,6 +56,7 @@ pub mod repository {
     use sqlx::postgres::PgQueryResult;
     use sqlx::FromRow;
     use sqlx::PgPool;
+    use tracing::instrument;
 
     #[derive(Debug, FromRow, sqlx::Type)]
     #[sqlx(transparent)]
@@ -65,6 +69,7 @@ pub mod repository {
         name: String,
     }
 
+    #[instrument(err, skip(db))]
     pub(crate) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS repository (
@@ -78,6 +83,7 @@ pub mod repository {
         .await
     }
 
+    #[instrument(err, skip(db))]
     pub async fn insert(
         db: &PgPool,
         owner: &str,
@@ -90,6 +96,7 @@ pub mod repository {
             .await
     }
 
+    #[instrument(err, skip(db))]
     pub async fn fetch_id(
         db: &PgPool,
         owner: &str,
@@ -109,6 +116,7 @@ pub mod summary {
         postgres::{PgQueryResult, PgRow},
         PgPool, Row,
     };
+    use tracing::instrument;
 
     use super::repository;
 
@@ -177,6 +185,7 @@ pub mod summary {
     }
 
     /// Creates the summary db table if it doesn't exist
+    #[instrument(err, skip(db))]
     pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS summary (
@@ -198,6 +207,7 @@ pub mod summary {
     }
 
     /// Inserts a test coverage summary into the summary db table
+    #[instrument(err, skip(db))]
     pub async fn insert_into_table(
         db: &PgPool,
         org: &str,
@@ -242,6 +252,7 @@ pub mod summary {
     }
 
     /// Fetches the summary table
+    #[instrument(err, skip(db))]
     pub async fn fetch_latest_summaries(db: &PgPool) -> Result<Vec<RepoSummary>, sqlx::Error> {
         let t = sqlx::query_as(
             r#"SELECT * FROM summary a
@@ -257,6 +268,7 @@ pub mod summary {
         t
     }
 
+    #[instrument(err, skip(db))]
     pub async fn fetch_repo_summaries(
         db: &PgPool,
         owner: &str,
@@ -279,6 +291,7 @@ pub mod reports {
     use crate::{db::DbError, gcovr};
     use serde::{ser::SerializeStruct, Serialize};
     use sqlx::{postgres::PgQueryResult, PgPool};
+    use tracing::instrument;
 
     use super::repository;
 
@@ -322,6 +335,7 @@ pub mod reports {
     }
 
     /// Creates the report db table if it doesn't exist
+    #[instrument(err, skip(db))]
     pub(super) async fn setup_table(db: &PgPool) -> Result<PgQueryResult, sqlx::Error> {
         sqlx::query(
             r#"CREATE TABLE IF NOT EXISTS reports (
@@ -339,6 +353,7 @@ pub mod reports {
     }
 
     /// Fetches the report table
+    #[instrument(err, skip(db))]
     pub async fn fetch_table(db: &PgPool) -> Result<Vec<ReportTableEntry>, DbError> {
         let resp: Vec<ReportTableEntry> = sqlx::query_as(
             "SELECT reports.insert_time, repository.owner, repository.name, reports.branch, reports.commit, reports.filepath, reports.report FROM reports INNER JOIN repository ON repository.id=reports.repository_id ORDER BY repository.owner, repository.name, insert_time;",
@@ -349,6 +364,7 @@ pub mod reports {
         Ok(resp)
     }
 
+    #[instrument(err, skip(db))]
     pub async fn fetch_specific_record(
         db: &PgPool,
         owner: &str,
@@ -378,6 +394,7 @@ pub mod reports {
     }
 
     /// Inserts a test coverage report into the report db table
+    #[instrument(err, skip(db))]
     pub async fn insert_into_table(
         db: &PgPool,
         repository_id: &repository::RepositoryId,
