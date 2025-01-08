@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>{{owner}} Summary</h1>
-    <table>
+    <table class="table-auto">
         <thead>
             <tr>
-                <th rowspan="2">Repository</th>
-                <th colspan="3">Latest Coverage</th>
+                <th rowspan="2" class="border border-slate-600">Repository</th>
+                <th colspan="3" class="border border-slate-600">Latest Coverage</th>
             </tr>
             <tr>
-                <th>Branch</th>
-                <th>Function</th>
-                <th>Line</th>
+                <th class="border border-slate-600">Branch</th>
+                <th class="border border-slate-600">Function</th>
+                <th class="border border-slate-600">Line</th>
             </tr>
             <tr hx-get="/summaries" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries">
-                <td><input type="text" name="repo" value=""></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td class="border border-slate-700"><input type="text" name="repo" value=""></td>
+                <td class="border border-slate-700"></td>
+                <td class="border border-slate-700"></td>
+                <td class="border border-slate-700"></td>
             </tr>
         </thead>
         <tbody id="summaries">

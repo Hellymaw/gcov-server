@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
-    <table>
+    <table class="table-auto">
         <thead>
             <tr>
-                <th rowspan="2">Type</th>
-                <th rowspan="2">Name</th>
-                <th colspan="3">Coverage Summary</th>
+                <th rowspan="2" class="border border-slate-600">Type</th>
+                <th rowspan="2" class="border border-slate-600">Name</th>
+                <th colspan="3" class="border border-slate-600">Coverage Summary</th>
             </tr>
             <tr>
-                <th>Branch</th>
-                <th>Function</th>
-                <th>Line</th>
+                <th class="border border-slate-600">Branch</th>
+                <th class="border border-slate-600">Function</th>
+                <th class="border border-slate-600">Line</th>
             </tr>
         </thead>
         <tbody>
             {% for file in files %}
             <tr>
-                <td>placeholder3</td>
+                <td class="border border-slate-700">placeholder3</td>
                 {% if file.is_dir %}
-                    <td><a href="/{{owner}}/{{repo}}/tree/{{commit}}{{path}}/{{file.name}}">{{file.name}}</td>
+                    <td class="border border-slate-700"><a href="/{{owner}}/{{repo}}/tree/{{commit}}{{path}}/{{file.name}}">{{file.name}}</td>
                 {% else %}
-                    <td><a href="/{{owner}}/{{repo}}/blob/{{commit}}{{path}}/{{file.name}}">{{file.name}}</td>
+                    <td class="border border-slate-700"><a href="/{{owner}}/{{repo}}/blob/{{commit}}{{path}}/{{file.name}}">{{file.name}}</td>
                 {% endif %}
-                <td>placeholder0</td>
-                <td>placeholder1</td>
-                <td>placeholder2</td>
+                <td class="border border-slate-700">placeholder0</td>
+                <td class="border border-slate-700">placeholder1</td>
+                <td class="border border-slate-700">placeholder2</td>
             </tr>
             {% endfor %}
         </tbody>
