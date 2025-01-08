@@ -1,6 +1,4 @@
 use lazy_static::lazy_static;
-use sqlx::postgres::PgQueryResult;
-use sqlx::FromRow;
 use sqlx::PgPool;
 use sqlx::Pool;
 use sqlx::Postgres;
@@ -106,7 +104,6 @@ pub mod repository {
 }
 
 pub mod summary {
-    use crate::db::DbError;
     use serde::{Deserialize, Serialize};
     use sqlx::{
         postgres::{PgQueryResult, PgRow},

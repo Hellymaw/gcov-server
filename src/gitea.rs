@@ -1,15 +1,8 @@
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::path::Path;
 
 lazy_static! {
     static ref GITEA_API_KEY: String = std::env::var("GITEA_API_KEY").unwrap();
-}
-
-pub async fn get_file(_path: &Path) -> String {
-    let file_data = "some\nfile\nwith\ndata";
-
-    file_data.to_string()
 }
 
 #[derive(Debug, Serialize)]
@@ -22,25 +15,6 @@ pub struct FileType {
     pub path: String,
     pub summary: Summary,
     pub is_dir: bool,
-}
-
-pub async fn get_repo_contents(_org: &str, _repo: &str, _commit: &str) -> Vec<FileType> {
-    vec![
-        FileType {
-            r#type: "file".to_string(),
-            name: "test".to_string(),
-            path: "/test".to_string(),
-            summary: Summary(30.2, 30.2, 30.2),
-            is_dir: false,
-        },
-        FileType {
-            r#type: "dir".to_string(),
-            name: "dir".to_string(),
-            path: "/dir".to_string(),
-            summary: Summary(30.2, 30.2, 30.2),
-            is_dir: true,
-        },
-    ]
 }
 
 pub mod repository {
