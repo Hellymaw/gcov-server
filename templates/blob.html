@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
-<table class="table-auto">
+<table class="table-auto rounded-lg border-2 mx-auto w-3/4">
     <tr>
-        <th>Line</th>
-        <th>Branch</th>
-        <th>Exec</th>
-        <th align="left">Source</th>
+        <th class="bg-slate-400 border border-slate-600 rounded-tl-lg">Line</th>
+        <th class="bg-slate-400 border border-slate-600">Branch</th>
+        <th class="bg-slate-400 border border-slate-600">Exec</th>
+        <th class="bg-slate-400 border border-slate-600 w-3/4 rounded-tr-lg" align="left">Source</th>
     </tr>
     {% for line in source_lines %}
     <tr>
-        <td class="lineno"><a id="l{{line.line_number}}" href="#l{{line.line_number}}">{{line.line_number}}</a></td>
-        <td class="linebranch">
+        <td class="bg-slate-500 border border-slate-600"><a id="l{{line.line_number}}" href="#l{{line.line_number}}">{{line.line_number}}</a></td>
+        <td class="bg-slate-500 border border-slate-600">
         {% if line.linebranchtotal > 0 %}
             <details class="linebranchDetails">
                 <summary class="linebranchSummary">{{line.linebranchtaken}}/{{line.linebranchtotal}}</summary>
@@ -28,8 +28,8 @@
             </details>
         {% endif %}
         </td>
-        <td>placeholder</td>
-        <td class="src" style="white-space: pre;">{{line.source}}</td>
+        <td class="bg-slate-500 border border-slate-600">placeholder</td>
+        <td class="bg-slate-500 pl-8 whitespace-pre w-3/4">{{line.source}}</td>
     </tr>
     {% endfor %}
 </table>

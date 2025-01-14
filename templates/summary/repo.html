@@ -1,9 +1,9 @@
 {% for report in reports %}
     <tr>
-        <td class="border border-slate-700">{{report.branch}}</td>
-        <td class="border border-slate-700"><a href="/{{owner}}/{{repo}}/tree/{{report.commit}}">{{report.commit}}</a></td>
-        <td class="border border-slate-700">{{report.coverage.branch.covered}}|{{report.coverage.branch.total}}</td>
-        <td class="border border-slate-700">{{report.coverage.function.covered}}|{{report.coverage.function.total}}</td>
-        <td class="border border-slate-700">{{report.coverage.line.covered}}|{{report.coverage.line.total}}</td>
+        <td class="bg-slate-500 border border-slate-700 pl-4">{{report.branch}}</td>
+        <td class="bg-slate-500 border border-slate-700 pl-4"><a href="/{{owner}}/{{repo}}/tree/{{report.commit}}" class="hover:text-blue-800 visited:text-purple-600">{{report.commit}}</a></td>
+        <td class="bg-slate-500 border border-slate-700 text-center">{{report.coverage.branch.covered}}|{{report.coverage.branch.total}}</td>
+        <td class="bg-slate-500 border border-slate-700 text-center">{{report.coverage.function.covered}}|{{report.coverage.function.total}}</td>
+        <td class="bg-slate-500 border border-slate-700 text-center">{{report.coverage.line.covered}}|{{report.coverage.line.total}}</td>
     </tr>
 {% endfor %}

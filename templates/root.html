@@ -1,24 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>Coverage Summaries</h1>
-    <table class="table-auto rounded-md container mx-auto w-3/4">
+    <table class="table-auto rounded-lg border-2 mx-auto w-3/4">
         <thead>
             <tr>
-                <th rowspan="2" class="bg-slate-400 border border-slate-600">Organisation</th>
+                <th rowspan="2" class="bg-slate-400 border rounded-tl-lg border-slate-600">Organisation</th>
                 <th rowspan="2" class="bg-slate-400 border border-slate-600">Repository</th>
-                <th colspan="3" class="bg-slate-400 border border-slate-600">Latest Coverage</th>
+                <th rowspan="2" colspan="3" class="bg-slate-400 border rounded-tr-lg border-slate-600">Latest Coverage</th>
             </tr>
-            <tr>
+            <tr></tr>
+            <tr hx-get="/summaries?root=1" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries">
+                <td class="bg-slate-500 border border-slate-700 pl-4"><input type="text" name="owner" value="" placeholder="Filter..." class="bg-transparent"></td>
+                <td class="bg-slate-500 border border-slate-700 pl-4"><input type="text" name="repo" value="" placeholder="Filter..." class="bg-transparent"></td>
                 <th class="bg-slate-400 border border-slate-600">Branch</th>
                 <th class="bg-slate-400 border border-slate-600">Function</th>
                 <th class="bg-slate-400 border border-slate-600">Line</th>
-            </tr>
-            <tr hx-get="/summaries?root=1" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries">
-                <td class="bg-slate-500 border border-slate-700"><input type="text" name="owner" value=""></td>
-                <td class="bg-slate-500 border border-slate-700"><input type="text" name="repo" value=""></td>
-                <td class="bg-slate-500 border border-slate-700"></td>
-                <td class="bg-slate-500 border border-slate-700"></td>
-                <td class="bg-slate-500 border border-slate-700"></td>
             </tr>
         </thead>
         <tbody id="summaries">

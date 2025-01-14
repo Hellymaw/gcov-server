@@ -1,9 +1,9 @@
 {% for summary in summaries %}
 <tr>
-    {% if root %}<td class="bg-slate-500 border border-slate-700"><a href="/{{summary.owner}}">{{summary.owner}}</td>{% endif %}
-    <td class="bg-slate-500 border border-slate-700"><a href="/{{summary.owner}}/{{summary.name}}">{{summary.name}}</a></td>
-    <td class="bg-slate-500 border border-slate-700">{{summary.coverage.branch.covered}}|{{summary.coverage.branch.total}}</td>
-    <td class="bg-slate-500 border border-slate-700">{{summary.coverage.function.covered}}|{{summary.coverage.function.total}}</td>
-    <td class="bg-slate-500 border border-slate-700">{{summary.coverage.line.covered}}|{{summary.coverage.line.total}}</td>
+    {% if root %}<td class="bg-slate-500 border border-slate-700 pl-4"><a href="/{{summary.owner}}" class="hover:text-blue-800 visited:text-purple-600">{{summary.owner}}</a></td>{% endif %}
+    <td class="bg-slate-500 border border-slate-700 pl-4"><a href="/{{summary.owner}}/{{summary.name}}" class="hover:text-blue-800 visited:text-purple-600">{{summary.name}}</a></td>
+    <td class="bg-slate-500 border border-slate-700 text-center">{{summary.coverage.branch.covered}}|{{summary.coverage.branch.total}}</td>
+    <td class="bg-slate-500 border border-slate-700 text-center">{{summary.coverage.function.covered}}|{{summary.coverage.function.total}}</td>
+    <td class="bg-slate-500 border border-slate-700 text-center">{{summary.coverage.line.covered}}|{{summary.coverage.line.total}}</td>
 </tr>
 {% endfor %}
