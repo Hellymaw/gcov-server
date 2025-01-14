@@ -209,16 +209,7 @@ pub async fn ingest_report(
 ) -> Result<(), AppError> {
     tracing::info!("{payload:?}");
 
-    // TODO: Shift into ::repository::
-    let repo_id = if let Some(id) = db::repository::fetch_id(&db, &owner, &repo).await? {
-        id
-    } else {
-        db::repository::insert(&db, &owner, &repo).await?;
-        db::repository::fetch_id(&db, &owner, &repo)
-            .await?
-            .ok_or(sqlx::Error::RowNotFound)?
-    };
-
+    let repo_id = db::repository::fetch_id_or_insert(&db, &owner, &repo).await?;
     let mut summary = db::summary::CoverageSummary::default();
     for entry in payload {
         for lines in &entry.lines {

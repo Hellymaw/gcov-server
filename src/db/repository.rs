@@ -53,3 +53,20 @@ pub async fn fetch_id(
         .fetch_optional(db)
         .await
 }
+
+#[instrument(err, skip(db))]
+pub async fn fetch_id_or_insert(
+    db: &PgPool,
+    owner: &str,
+    name: &str,
+) -> Result<RepositoryId, sqlx::Error> {
+    match fetch_id(db, owner, name).await? {
+        Some(id) => Ok(id),
+        _ => {
+            insert(db, owner, name).await?;
+            fetch_id(db, owner, name)
+                .await?
+                .ok_or(sqlx::Error::RowNotFound)
+        }
+    }
+}

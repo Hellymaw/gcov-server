@@ -103,15 +103,7 @@ pub async fn insert_into_table(
     commit: &str,
     coverage: &CoverageSummary,
 ) -> Result<PgQueryResult, sqlx::Error> {
-    let repo_id = if let Some(id) = repository::fetch_id(db, org, repo).await? {
-        id
-    } else {
-        repository::insert(db, org, repo).await?;
-        repository::fetch_id(db, org, repo)
-            .await?
-            .ok_or(sqlx::Error::RowNotFound)?
-    };
-
+    let repo_id = repository::fetch_id_or_insert(db, org, repo).await?;
     sqlx::query("INSERT INTO summary(insert_time, repository_id, branch, commit, branch_covered, branch_total, function_covered, function_total, line_covered, line_total) VALUES (now(), $1, $2, $3, $4, $5, $6, $7, $8, $9);")
         .bind(repo_id)
         .bind(branch)
