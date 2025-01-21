@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>Coverage Summaries</h1>
-    <div class="w-3/4 border rounded-lg overflow-hidden border-slate-600 bg-slate-500">
-    <table class="min-w-full divide-y divide-slate-600">
-        <thead class="bg-slate-400">
-            <tr class="divide-y divide-slate-600">
+    <div class="w-3/4 border rounded-lg overflow-hidden dark:border-slate-500">
+    <table class="min-w-full divide-y dark:divide-slate-500">
+        <thead class="bg-slate-200 dark:bg-slate-700">
+            <tr>
                 <th rowspan="2">Organisation</th>
                 <th rowspan="2">Repository</th>
                 <th rowspan="2" colspan="3">Latest Coverage</th>
             </tr>
-            <tr class="divide-y divide-slate-600"></tr>
-            <tr hx-get="/summaries?root=1" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries" class="divide-y divide-x divide-slate-600">
-                <td class="bg-slate-500 pl-4"><input type="text" name="owner" value="" placeholder="Filter..." class="bg-transparent"></td>
-                <td class="bg-slate-500 pl-4"><input type="text" name="repo" value="" placeholder="Filter..." class="bg-transparent"></td>
+            <tr></tr>
+            <tr hx-get="/summaries?root=1" hx-trigger="load, input delay:500ms" hx-include="this" hx-target="#summaries">
+                <td class="bg-slate-100 dark:bg-slate-800 pl-4"><input type="text" name="owner" value="" placeholder="Filter..." class="bg-transparent"></td>
+                <td class="bg-slate-100 dark:bg-slate-800 pl-4"><input type="text" name="repo" value="" placeholder="Filter..." class="bg-transparent"></td>
                 <th>Branch</th>
                 <th>Function</th>
                 <th>Line</th>
             </tr>
         </thead>
-        <tbody id="summaries" class="divide-y divide-slate-600">
+        <tbody id="summaries" class="divide-y dark:divide-slate-500">
         </tbody>
     </table>
     </div>

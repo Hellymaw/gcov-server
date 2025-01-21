@@ -1,5 +1,5 @@
 {% for summary in summaries %}
-<tr class="divide-y divide-slate-600">
+<tr>
     {% if root %}<td class="pl-4"><a href="/{{summary.owner}}" class="hover:text-blue-800">{{summary.owner}}</a></td>{% endif %}
     <td class="pl-4"><a href="/{{summary.owner}}/{{summary.name}}" class="hover:text-blue-800">{{summary.name}}</a></td>
     <td class="text-center">{{summary.coverage.branch.covered}}|{{summary.coverage.branch.total}}</td>
