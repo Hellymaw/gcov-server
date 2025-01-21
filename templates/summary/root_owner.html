@@ -1,7 +1,7 @@
 {% for summary in summaries %}
 <tr>
-    {% if root %}<td class="pl-4"><a href="/{{summary.owner}}" class="hover:text-blue-800">{{summary.owner}}</a></td>{% endif %}
-    <td class="pl-4"><a href="/{{summary.owner}}/{{summary.name}}" class="hover:text-blue-800">{{summary.name}}</a></td>
+    {% if root %}<td class="pl-4"><a href="/{{summary.owner}}" class="hover:text-blue-500">{{summary.owner}}</a></td>{% endif %}
+    <td class="pl-4"><a href="/{{summary.owner}}/{{summary.name}}" class="hover:text-blue-500">{{summary.name}}</a></td>
     <td class="text-center">{{summary.coverage.branch.covered}}|{{summary.coverage.branch.total}}</td>
     <td class="text-center">{{summary.coverage.function.covered}}|{{summary.coverage.function.total}}</td>
     <td class="text-center">{{summary.coverage.line.covered}}|{{summary.coverage.line.total}}</td>

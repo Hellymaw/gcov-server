@@ -12,15 +12,17 @@
     </head>
     <body class="bg-light-primary text-light-secondary transition dark:bg-dark-primary dark:text-dark-secondary">
         {% block nav %}
-        <nav>
-            <ol>
-                <li><a href="/">Home</a></li>
-            </ol>
-        </nav>
+        <header class="bg-slate-200 dark:bg-slate-700 border-b dark:border-slate-500">
+            <div class="p-1">
+                <a href="/" class="hover:text-blue-800 text-xl pl-4">Home</a>
+            </div>
+        </header>
         {% endblock nav %}
         <main class="flex flex-col items-center gap-2">
             {% block content %}{% endblock content %}
         </main>
-        <div id="footer">{% block footer %} {% endblock footer %}</div>
     </body>
+    <footer class="w-full absolute bottom-0 border-t dark:border-slate-500">
+        v0.0.0
+    </footer>
 </html>
