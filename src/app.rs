@@ -59,12 +59,12 @@ lazy_static::lazy_static! {
     pub static ref TEMPLATES: Tera = Tera::new("templates/**/*").unwrap();
 }
 
-#[instrument(err, skip(_db))]
+#[instrument(skip(_db))]
 pub async fn root_handler(_db: Extension<PgPool>) -> Result<Html<String>, AppError> {
     Ok(Html(TEMPLATES.render("root.html", &Context::new())?))
 }
 
-#[instrument(err, skip(_db))]
+#[instrument(skip(_db))]
 pub async fn owner_handler(
     _db: Extension<PgPool>,
     Path(owner): Path<String>,
@@ -74,7 +74,7 @@ pub async fn owner_handler(
     Ok(Html(TEMPLATES.render("owner.html", &context)?))
 }
 
-#[instrument(err, skip(_db))]
+#[instrument(skip(_db))]
 pub async fn repo_handler(
     _db: Extension<PgPool>,
     Path((owner, repo)): Path<(String, String)>,
@@ -87,7 +87,7 @@ pub async fn repo_handler(
     Ok(Html::from(TEMPLATES.render("repo.html", &context)?))
 }
 
-#[instrument(err, skip(_db))]
+#[instrument(skip(_db))]
 pub async fn tree_handler(
     _db: Extension<PgPool>,
     Path((owner, repo, path)): Path<(String, String, String)>,
@@ -201,7 +201,7 @@ pub async fn blob_handler(
     }
 }
 
-#[instrument(ret, err, skip(db))]
+#[instrument(skip(db))]
 pub async fn ingest_report(
     db: Extension<PgPool>,
     Path((owner, repo, commit)): Path<(String, String, String)>,
@@ -233,7 +233,7 @@ pub async fn ingest_report(
     Ok(())
 }
 
-#[instrument(err, skip(db))]
+#[instrument(skip(db))]
 pub async fn test_ingest_report(
     db: Extension<PgPool>,
     Path((_owner, _repo, _commit, _filepath)): Path<(String, String, String, String)>,
@@ -243,7 +243,7 @@ pub async fn test_ingest_report(
     Ok(Json(table))
 }
 
-#[instrument(err, skip(db))]
+#[instrument(skip(db))]
 pub async fn root_summary_handler(
     db: Extension<PgPool>,
     Query(params): Query<HashMap<String, String>>,
@@ -273,7 +273,7 @@ pub async fn root_summary_handler(
     Ok(Html::from(output))
 }
 
-#[instrument(err, skip(db))]
+#[instrument(skip(db))]
 pub async fn repo_summaries_handler(
     db: Extension<PgPool>,
     Path((owner, repo)): Path<(String, String)>,
