@@ -1,0 +1,10 @@
+{% for line in table_data %}
+<tr>
+    {% for column in line.columns %}
+    <td class="pl-4"><a href="/{{ column.uri }}" class="hover:text-blue-500">{{ column.name }}</a></td>
+    {% endfor %}
+    <td class="text-center">{{line.coverage.branch}}</td>
+    <td class="text-center">{{line.coverage.function}}</td>
+    <td class="text-center">{{line.coverage.line}}</td>
+</tr>
+{% endfor %}
