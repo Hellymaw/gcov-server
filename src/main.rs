@@ -1,5 +1,5 @@
 use axum::{routing::get, Extension, Router};
-use tower_http::trace::TraceLayer;
+use tower_http::{services::ServeDir, trace::TraceLayer};
 use tracing::instrument;
 use tracing_appender;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -62,6 +62,7 @@ async fn main() {
             get(app::test_ingest_report).post(app::ingest_report),
         )
         .layer(Extension(db_pool))
+        .nest_service("/assets", ServeDir::new("build"))
         .layer(TraceLayer::new_for_http());
 
     let bind_addr = std::env::var("BIND_ADDRESS").unwrap_or("0.0.0.0:3003".to_string());

@@ -2,51 +2,13 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
+
+        <link rel="stylesheet" href="/assets/index.89tmza4a.css" />
+        <script defer src="/assets/index.xvmfcgjd.js"></script>
+
         {% block head %}
         <title>{% block title %}Coverage Server{% endblock title %}</title>
         {% endblock head %}
-        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script>
-            tailwind.config = {
-                theme: {
-                    extend: {
-                        colors: {
-                            blue: "#1fb6ff",
-                            purple: "#7e5bef",
-                            pink: "#ff49db",
-                            orange: "#ff7849",
-                            green: "#13ce66",
-                            yellow: "#ffc82c",
-                            "gray-dark": "#273444",
-                            gray: "#8492a6",
-                            "gray-light": "#d3dce6",
-                        },
-                        fontFamily: {
-                            sans: ["Graphik", "sans-serif"],
-                            serif: ["Merriweather", "serif"],
-                        },
-                        spacing: {
-                            "8xl": "96rem",
-                            "9xl": "128rem",
-                        },
-                        borderRadius: {
-                            "4xl": "2rem",
-                        },
-                    },
-                    container: {
-                        center: true,
-                    },
-                },
-            };
-        </script>
-        <style type="text/tailwindcss">
-            @layer utilities {
-                .content-auto {
-                    content-visibility: auto;
-                }
-            }
-        </style>
     </head>
     <body class="bg-slate-800">
         {% block nav %}

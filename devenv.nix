@@ -12,7 +12,14 @@ rec {
 
   packages = [ pkgs.git pkgs.docker pkgs.openssl ];
 
-  languages.rust.enable = true;
+  languages = {
+    rust.enable = true;
+    javascript = {
+      enable = true;
+      bun.enable = true;
+    };
+  };
+
 
   processes = {
     gitea.exec = "cd dev/gitea; docker compose up";
