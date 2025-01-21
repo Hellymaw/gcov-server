@@ -27,14 +27,11 @@ fn main() {
             "--minify",
             "--outdir=build",
             "--entry-naming",
-            "[name].[hash].[ext]",
+            "[name].[ext]",
             "--asset-naming",
-            "[name].[hash].[ext]",
+            "[name].[ext]",
             "./assets/scripts/index.ts",
         ])
         .status()
         .expect("failed to run bun");
-
-    println!("hello");
-    std::fs::remove_file("build/index.css").unwrap_or_default();
 }
