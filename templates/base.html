@@ -10,7 +10,7 @@
         <title>{% block title %}Coverage Server{% endblock title %}</title>
         {% endblock head %}
     </head>
-    <body class="bg-slate-800">
+    <body class="bg-light-primary text-light-secondary transition dark:bg-dark-primary dark:text-dark-secondary">
         {% block nav %}
         <nav>
             <ol>
@@ -18,9 +18,9 @@
             </ol>
         </nav>
         {% endblock nav %}
-        <div id="content" class="container mx-auto">
+        <main class="flex flex-col items-center gap-2">
             {% block content %}{% endblock content %}
-        </div>
+        </main>
         <div id="footer">{% block footer %} {% endblock footer %}</div>
     </body>
 </html>
